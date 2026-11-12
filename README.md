@@ -67,3 +67,8 @@ tools/build.sh    # load every file in src/ and test/ with UCM 1.5.0, then run e
 ```
 
 Each source file says one thing in at most 80 lines; a definition's documentation is its `{{ }}` block.
+
+## License
+
+Licensed under either of the [Apache License, Version 2.0](LICENSE-APACHE) or the [MIT license](LICENSE-MIT), at your
+option. A contribution you submit for inclusion is licensed the same way, without any other terms or conditions.

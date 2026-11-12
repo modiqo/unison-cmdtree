@@ -1,0 +1,23 @@
+README : Doc
+README =
+  {{
+  # cmdtree
+
+  A command line declared once, as a typed tree. The parser, its refusals, the help and a JSON export all come from
+  that one value, so they cannot disagree.
+
+  @source{cmdtree.tests.readme}
+
+  ''cmdtree.parse cmdtree.tests.readme ["show", "--last", "2"]'' runs the second form of ''show'' with ''last''
+  set to 2; ''cmdtree.parse cmdtree.tests.readme ["show", "--lsat", "2"]'' is refused as an unknown option, with
+  ''--last'' as the nearest. A test holds both.
+
+  * {cmdtree.parse}: words to the form to run and its values, a request for help, or a {type cmdtree.Refusal}.
+  * {cmdtree.faults}: what is wrong with a tree, such as two forms a call cannot tell apart.
+  * {cmdtree.audit}: a program's whole test of its tree: faults, examples, sample calls, wrong calls.
+  * {cmdtree.help}, {cmdtree.toDoc}, {cmdtree.markdown}, {cmdtree.Refusal.say}: help and refusals for people.
+  * {cmdtree.export}: the tree as JSON, for programs in other languages.
+
+  Source, issues and changes: [modiqo/unison-cmdtree](https://github.com/modiqo/unison-cmdtree). Licensed under
+  either of the Apache License, Version 2.0 or the MIT license, at your option.
+  }}
