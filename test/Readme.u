@@ -1,0 +1,23 @@
+use test check
+
+-- The README's example, as written there: the calls it shows give what it says.
+cmdtree.tests.readme : cmdtree.Node Text
+cmdtree.tests.readme =
+  use cmdtree arg command examples form option required switch
+  use cmdtree.Kind Natural Plain
+  byId = examples ["notes show 12"] (form [] [arg "ID" Natural "The note."] "byId")
+  last = examples ["notes show --last 2"] (form [required (option "last" Natural "The newest ones.")] [] "last")
+  show = command "show" "Read" "Show notes." [] [byId, last]
+  add = command "add" "Write" "Add a note." [] [form [switch "pin" "Keep it at the top."] [arg "TEXT" Plain ""] "add"]
+  command "notes" "" "Keep notes." [add, show] []
+
+test> cmdtree.tests.readmeCalls =
+  last = match cmdtree.parse cmdtree.tests.readme ["show", "--last", "2"] with
+    Right (cmdtree.Call.Run path i form parsed) ->
+      Some (path, i, cmdtree.Form.run form, cmdtree.Parsed.nat "last" parsed)
+    _ -> None
+  typo = cmdtree.parse cmdtree.tests.readme ["show", "--lsat", "2"]
+  check
+    ((last === Some (["notes", "show"], 1, "last", Some 2))
+      && (typo === Left (cmdtree.Refusal.UnknownOption ["notes", "show"] "--lsat" (Some "--last")))
+      && (cmdtree.audit cmdtree.tests.readme === []))

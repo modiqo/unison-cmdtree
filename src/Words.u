@@ -1,0 +1,54 @@
+{{ A command line split into words as a shell would for plain text: spaces separate words, and text in double quotes
+   is one word without its quotes (''notes add "two words"'' is three words). }}
+cmdtree.words : Text -> [Text]
+cmdtree.words line =
+  (current, _, done) = List.foldLeft cmdtree.words.step ("", false, []) (Text.toCharList line)
+  if current === "" then done else done :+ current
+
+{{ One character of ''cmdtree.words'': the word so far, whether inside quotes, and the words before. }}
+cmdtree.words.step : (Text, Boolean, [Text]) -> Char -> (Text, Boolean, [Text])
+cmdtree.words.step state c = match (state, c) with
+  ((current, quoted, done), ?\") -> (current, not quoted, done)
+  ((current, false, done), ?\s) -> if current === "" then ("", false, done) else ("", false, done :+ current)
+  ((current, quoted, done), _) -> (current ++ Char.toText c, quoted, done)
+
+{{ Every form of the tree with the path of its command and its index among the command's forms. }}
+cmdtree.formsOf : cmdtree.Node r -> [([Text], Nat, cmdtree.Form r)]
+cmdtree.formsOf root = cmdtree.formsOf.at [] root
+
+{{ The forms of a command and of everything under it, with the path above it. }}
+cmdtree.formsOf.at : [Text] -> cmdtree.Node r -> [([Text], Nat, cmdtree.Form r)]
+cmdtree.formsOf.at above node =
+  path = above :+ cmdtree.Node.name node
+  own = List.map (cases (f, i) -> (path, i, f)) (List.indexed (cmdtree.Node.forms node))
+  own ++ List.flatMap (cmdtree.formsOf.at path) (cmdtree.Node.children node)
+
+{{ The words of a call of the form, the command's path left out, as two lists of parts by name: each option given
+   (''--name'' and its value from ''value'', a switch alone) and each argument, then one value of its rest. }}
+cmdtree.Form.parts : (Text -> cmdtree.Kind -> Text) -> cmdtree.Form r -> ([(Text, [Text])], [(Text, [Text])])
+cmdtree.Form.parts value form =
+  flag f =
+    name = cmdtree.Flag.name f
+    match cmdtree.Flag.takes f with
+      Some k -> (name, ["--" ++ name, value name k])
+      None -> (name, ["--" ++ name])
+  arg a = (cmdtree.Arg.name a, [value (cmdtree.Arg.name a) (cmdtree.Arg.kind a)])
+  args = cmdtree.Form.args form ++ Optional.toList (cmdtree.Form.rest form)
+  (List.map flag (cmdtree.Form.flags form), List.map arg args)
+
+{{ A call of the form with a sample value for every option and argument, every switch given, and one value of its
+   rest: the words after the command's path. }}
+cmdtree.Form.sample : cmdtree.Form r -> [Text]
+cmdtree.Form.sample form =
+  (flags, args) = cmdtree.Form.parts (_ k -> cmdtree.Kind.sample k) form
+  List.flatMap at2 flags ++ List.flatMap at2 args
+
+{{ The command at a path, the program's name first. }}
+cmdtree.Node.at : [Text] -> cmdtree.Node r -> Optional (cmdtree.Node r)
+cmdtree.Node.at path node = match path with
+  [n] | n === cmdtree.Node.name node -> Some node
+  n +: (next +: rest) | n === cmdtree.Node.name node ->
+    match List.find (c -> cmdtree.Node.name c === next) (cmdtree.Node.children node) with
+      Some c -> cmdtree.Node.at (next +: rest) c
+      None -> None
+  _ -> None

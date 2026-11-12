@@ -1,0 +1,46 @@
+{{ Test a tree as a program's own test would: its faults, then for every form that each of its examples calls it
+   (test 1), that a call made of its own samples parses back to it with every value given (test 2), and that wrong
+   calls made from it are refused for the right reason (test 3). Each line names the form and the call. }}
+cmdtree.audit : cmdtree.Node r -> [Text]
+cmdtree.audit root = cmdtree.faults root ++ List.flatMap (cmdtree.audit.form root) (cmdtree.formsOf root)
+
+{{ Whether the words, the program's name left out, run the form ''i'' of the command at ''path''. }}
+cmdtree.audit.runs : cmdtree.Node r -> [Text] -> Nat -> [Text] -> Boolean
+cmdtree.audit.runs root path i words = match cmdtree.parse root words with
+  Right (cmdtree.Call.Run p j _ _) -> (p === path) && (j == i)
+  _ -> false
+
+{{ The audit of one form: its examples, its own sample, and the wrong calls. }}
+cmdtree.audit.form : cmdtree.Node r -> ([Text], Nat, cmdtree.Form r) -> [Text]
+cmdtree.audit.form root = cases
+  (path, i, form) ->
+    at = Text.join " " path ++ " (form " ++ Nat.toText (i + 1) ++ ")"
+    runs = cmdtree.audit.runs root path i
+    program = cmdtree.Node.name root
+    strip = cases
+      w +: rest | w === program -> rest
+      ws -> ws
+    example line = if runs (strip (cmdtree.words line)) then [] else [at ++ ": `" ++ line ++ "` does not call it"]
+    call = List.drop 1 path ++ cmdtree.Form.sample form
+    names =
+      args = cmdtree.Form.args form ++ Optional.toList (cmdtree.Form.rest form)
+      List.map cmdtree.Flag.name (cmdtree.Form.flags form) ++ List.map cmdtree.Arg.name args
+    back = match cmdtree.parse root call with
+      Right (cmdtree.Call.Run p j _ parsed) | (p === path) && (j == i) ->
+        List.all (n -> cmdtree.Parsed.given n parsed) names
+      _ -> false
+    shown = Text.join " " (program +: call)
+    roundTrip = if back then [] else [at ++ ": `" ++ shown ++ "`, made of its samples, does not parse back to it"]
+    List.flatMap example (cmdtree.Form.examples form) ++ roundTrip ++ cmdtree.audit.wrong root (path, i, form) at
+
+{{ A value a kind refuses, when one is known: none for plain text, which takes any word, or a custom kind. }}
+cmdtree.Kind.bad : cmdtree.Kind -> Optional Text
+cmdtree.Kind.bad = cases
+  cmdtree.Kind.Plain -> None
+  cmdtree.Kind.Natural -> Some "x"
+  cmdtree.Kind.Integer -> Some "x"
+  cmdtree.Kind.Choice words -> if List.contains "zz-none" words then None else Some "zz-none"
+  cmdtree.Kind.Span -> Some "7"
+  cmdtree.Kind.Day -> Some "2026-13-01"
+  cmdtree.Kind.JsonText -> Some "{"
+  cmdtree.Kind.Custom _ _ _ -> None

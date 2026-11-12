@@ -1,0 +1,37 @@
+{{ The faults of one form at ''at'' (its command path and its number from 1): two options of one name or one short
+   name, ''help'' or ''-h'' taken (the parser keeps them for help), a required switch, two arguments of one name or one
+   named like an option, and an argument that must be given after one that may be left out. }}
+cmdtree.Form.faults : Text -> cmdtree.Form r -> [Text]
+cmdtree.Form.faults at form =
+  flags = cmdtree.Form.flags form
+  names = List.map cmdtree.Flag.name flags
+  shorts = List.flatMap (f -> Optional.toList (cmdtree.Flag.short f)) flags
+  args = cmdtree.Form.args form ++ Optional.toList (cmdtree.Form.rest form)
+  argNames = List.map cmdtree.Arg.name args
+  twice xs = List.distinct (List.filter (x -> Nat.gt (List.size (List.filter (y -> y === x) xs)) 1) xs)
+  said = cases
+    (true, why) -> [at ++ ": " ++ why]
+    (false, _) -> []
+  late = List.dropWhile cmdtree.Arg.required (cmdtree.Form.args form)
+  List.flatMap said
+    [ (not (List.isEmpty (twice names)), "two options named --" ++ Text.join ", --" (twice names))
+    , (not (List.isEmpty (twice shorts)), "two options share a short name")
+    , (List.contains "help" names || List.contains ?h shorts, "--help and -h are kept for help")
+    , (List.any (f -> cmdtree.Flag.required f && Optional.isNone (cmdtree.Flag.takes f)) flags,
+        "a required switch: a switch that must be given says nothing")
+    , (not (List.isEmpty (twice argNames)), "two arguments named " ++ Text.join ", " (twice argNames))
+    , (List.any (n -> List.contains n names) argNames, "an argument named like an option")
+    , (List.any cmdtree.Arg.required late, "a required argument after one that may be left out")
+    ]
+
+{{ Whether two forms of one command can be told apart by the options a call gives: one of them requires an option
+   the other does not take. The parser then never has two forms to choose between, and ''clap'' can say the same. }}
+cmdtree.Form.apart : cmdtree.Form r -> cmdtree.Form r -> Boolean
+cmdtree.Form.apart a b =
+  takes form n = List.any (f -> cmdtree.Flag.name f === n) (cmdtree.Form.flags form)
+  needs form = List.map cmdtree.Flag.name (List.filter cmdtree.Flag.required (cmdtree.Form.flags form))
+  List.any (n -> not (takes b n)) (needs a) || List.any (n -> not (takes a n)) (needs b)
+
+{{ The shape of an option, which every form of a command must give it alike: its short name and what it takes. }}
+cmdtree.Flag.shape : cmdtree.Flag -> (Optional Char, Optional Text)
+cmdtree.Flag.shape f = (cmdtree.Flag.short f, Optional.map cmdtree.Kind.placeholder (cmdtree.Flag.takes f))

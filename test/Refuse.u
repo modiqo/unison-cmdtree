@@ -1,0 +1,38 @@
+use test check
+
+-- Each wrong call is refused with its own kind, at the command it reached, naming the word that is wrong.
+test> cmdtree.tests.refusals =
+  use cmdtree.Refusal BadValue GivenTwice MissingCommand MissingRequired MissingValue OptionOfAnotherForm
+  use cmdtree.Refusal TooManyArguments UnknownCommand UnknownOption
+  p line = cmdtree.parse cmdtree.tests.notes (Text.split ?\s line)
+  no line = match p line with
+    Left r -> Some r
+    Right _ -> None
+  notDay = "it is not a day written YYYY-MM-DD"
+  (top, list, show, sync) = (["notes"], ["notes", "list"], ["notes", "show"], ["notes", "sync"])
+  check
+    ((no "lst" === Some (UnknownCommand top "lst" (Some "list")))
+      && (no "sync" === Some (MissingCommand sync ["push", "pull"]))
+      && (no "sync psh" === Some (UnknownCommand sync "psh" (Some "push")))
+      && (no "list --limt 3" === Some (UnknownOption list "--limt" (Some "--limit")))
+      && (no "list --pin" === Some (UnknownOption list "--pin" None))
+      && (no "list --limit" === Some (MissingValue list "--limit"))
+      && (no "list --limit x" === Some (BadValue list "--limit" "nat" "x" "it is not a whole number of 0 or more"))
+      && (no "list --format=xml" === Some (BadValue list "--format" "choice" "xml" "it is not one of text, json"))
+      && (no "list --limit 1 --limit 2" === Some (GivenTwice list "--limit"))
+      && (no "list extra" === Some (TooManyArguments list "extra"))
+      && (no "show" === Some (MissingRequired show "ID"))
+      && (no "show x" === Some (BadValue show "ID" "nat" "x" "it is not a whole number of 0 or more"))
+      && (no "add" === Some (MissingRequired ["notes", "add"] "TEXT"))
+      && (no "add x --pin=yes" === Some (BadValue ["notes", "add"] "--pin" "switch" "yes" "a switch takes no value"))
+      && (no "sync pull 2026-02-30" === Some (BadValue (sync :+ "pull") "DAY" "day" "2026-02-30" notDay)))
+
+-- An option that belongs to another form of the same command is named with that form's synopsis.
+test> cmdtree.tests.otherForm =
+  node =
+    use cmdtree command form option required switch
+    a = form [required (option "project" cmdtree.Kind.Plain "A project.")] [] "byProject"
+    b = form [switch "all" "Every session."] [cmdtree.arg "SESSION" cmdtree.Kind.Plain "A session."] "bySession"
+    command "stats" "" "Figures." [] [a, b]
+  got = cmdtree.parse node ["--project", "x", "--all"]
+  check (got === Left (cmdtree.Refusal.OptionOfAnotherForm ["stats"] "--all" "stats SESSION [--all]"))

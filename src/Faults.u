@@ -1,0 +1,35 @@
+{{ Every fault of a tree, each naming where it is; none means the parser and every renderer can take the tree. A
+   program checks its tree with this in a test. Besides each form's own faults: a command with neither forms nor
+   subcommands, two subcommands of one name, a subcommand whose name is empty or reads as an option or holds a
+   space, an option of one name given two shapes by two forms, and two forms that cannot be told apart. }}
+cmdtree.faults : cmdtree.Node r -> [Text]
+cmdtree.faults root = cmdtree.faults.at [] root
+
+{{ The faults of a command and of everything under it, with the path above it. }}
+cmdtree.faults.at : [Text] -> cmdtree.Node r -> [Text]
+cmdtree.faults.at above node =
+  path = above :+ cmdtree.Node.name node
+  at = Text.join " " path
+  children = cmdtree.Node.children node
+  forms = List.indexed (cmdtree.Node.forms node)
+  names = List.map cmdtree.Node.name children
+  name = cmdtree.Node.name node
+  bad = (name === "") || cmdtree.isOption name || Text.contains " " name
+  empty = List.isEmpty children && List.isEmpty forms
+  repeated = List.distinct (List.filter (n -> Nat.gt (List.size (List.filter (m -> m === n) names)) 1) names)
+  flags = List.flatMap cmdtree.Form.flags (cmdtree.Node.forms node)
+  shapes n = List.distinct (List.map cmdtree.Flag.shape (List.filter (f -> cmdtree.Flag.name f === n) flags))
+  mixed = List.filter (n -> Nat.gt (List.size (shapes n)) 1) (List.distinct (List.map cmdtree.Flag.name flags))
+  pairs = List.flatMap (cases (a, i) -> List.map (b -> ((a, i), b)) (List.drop (i + 1) forms)) forms
+  close = cases
+    ((a, i), (b, j)) | not (cmdtree.Form.apart a b) ->
+      [at ++ ": forms " ++ Nat.toText (i + 1) ++ " and " ++ Nat.toText (j + 1) ++ " cannot be told apart"]
+    _ -> []
+  own =
+    (if bad then [at ++ ": a command name must be one word that does not start with -"] else [])
+      ++ (if empty then [at ++ ": no forms and no subcommands"] else [])
+      ++ List.map (n -> at ++ ": two subcommands named " ++ n) repeated
+      ++ List.map (n -> at ++ ": --" ++ n ++ " has two shapes in its forms") mixed
+      ++ List.flatMap close pairs
+  formFaults = cases (f, i) -> cmdtree.Form.faults (at ++ " (form " ++ Nat.toText (i + 1) ++ ")") f
+  own ++ List.flatMap formFaults forms ++ List.flatMap (cmdtree.faults.at path) children

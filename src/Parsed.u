@@ -1,0 +1,27 @@
+{{ The values given for ''name'', in order; none when it was not given. }}
+cmdtree.Parsed.texts : Text -> cmdtree.Parsed -> [Text]
+cmdtree.Parsed.texts name p =
+  match List.find (cases (n, _) -> n === name) (cmdtree.Parsed.values p) with
+    Some (_, vs) -> vs
+    None -> []
+
+{{ The first value given for ''name''. }}
+cmdtree.Parsed.text : Text -> cmdtree.Parsed -> Optional Text
+cmdtree.Parsed.text name p = List.head (cmdtree.Parsed.texts name p)
+
+{{ Whether ''name'' was given: a switch, or an option or argument with a value. }}
+cmdtree.Parsed.given : Text -> cmdtree.Parsed -> Boolean
+cmdtree.Parsed.given name p =
+  List.contains name (cmdtree.Parsed.switches p) || not (List.isEmpty (cmdtree.Parsed.texts name p))
+
+{{ The first value of a ''Natural'' option or argument. }}
+cmdtree.Parsed.nat : Text -> cmdtree.Parsed -> Optional Nat
+cmdtree.Parsed.nat name p = Optional.flatMap Nat.fromText (cmdtree.Parsed.text name p)
+
+{{ The first value of an ''Integer'' option or argument. }}
+cmdtree.Parsed.int : Text -> cmdtree.Parsed -> Optional Int
+cmdtree.Parsed.int name p = Optional.flatMap Int.fromText (cmdtree.Parsed.text name p)
+
+{{ The first value of a ''Span'' option or argument, in milliseconds. }}
+cmdtree.Parsed.millis : Text -> cmdtree.Parsed -> Optional Nat
+cmdtree.Parsed.millis name p = Optional.flatMap cmdtree.Kind.millis (cmdtree.Parsed.text name p)

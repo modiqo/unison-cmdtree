@@ -1,0 +1,37 @@
+{{ Parse a call's words, the program's name left out, against the program's tree: the form to run with its values,
+   a request for help, or why the words were refused. Subcommands are read first: each word that names a
+   subcommand of the command reached so far goes down to it. The rest belongs to the command reached. }}
+cmdtree.parse : cmdtree.Node r -> [Text] -> Either cmdtree.Refusal (cmdtree.Call r)
+cmdtree.parse root words = cmdtree.parse.at root [cmdtree.Node.name root] words
+
+{{ Go down the tree while the next word names a subcommand. }}
+cmdtree.parse.at : cmdtree.Node r -> [Text] -> [Text] -> Either cmdtree.Refusal (cmdtree.Call r)
+cmdtree.parse.at node path words =
+  child w = List.find (c -> cmdtree.Node.name c === w) (cmdtree.Node.children node)
+  match words with
+    w +: rest | not (cmdtree.isOption w) -> match child w with
+      Some c -> cmdtree.parse.at c (path :+ w) rest
+      None -> cmdtree.parse.here node path words
+    _ -> cmdtree.parse.here node path words
+
+{{ The words that remain belong to this command: ''--help'' or ''-h'' before any ''--'' asks for its help; a command
+   with no forms needs a subcommand; otherwise the words are read against its forms. A word left over at a command
+   that has subcommands is refused as an unknown subcommand, with the nearest one. }}
+cmdtree.parse.here : cmdtree.Node r -> [Text] -> [Text] -> Either cmdtree.Refusal (cmdtree.Call r)
+cmdtree.parse.here node path words =
+  names = List.map cmdtree.Node.name (cmdtree.Node.children node)
+  asked = List.any (w -> (w === "--help") || (w === "-h")) (List.takeWhile (w -> not (w === "--")) words)
+  unknown w = cmdtree.Refusal.UnknownCommand path w (cmdtree.nearest w names)
+  match (asked, cmdtree.Node.forms node, words) with
+    (true, _, _) -> Right (cmdtree.Call.Help path)
+    (_, [], []) -> Left (cmdtree.Refusal.MissingCommand path names)
+    (_, [], w +: _) | not (cmdtree.isOption w) -> Left (unknown w)
+    (_, [], w +: _) -> Left (cmdtree.Refusal.UnknownOption path w None)
+    _ ->
+      read = cmdtree.read path (cmdtree.Node.flags node) [] [] words
+      chosen = match read with
+        Left r -> Left r
+        Right (given, rest) -> cmdtree.choose path node given rest
+      match chosen with
+        Left (cmdtree.Refusal.TooManyArguments _ w) | not (List.isEmpty names) -> Left (unknown w)
+        other -> other

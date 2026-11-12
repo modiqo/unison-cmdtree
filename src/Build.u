@@ -1,0 +1,47 @@
+{{ A switch: ''--name'', given or not. }}
+cmdtree.switch : Text -> Text -> cmdtree.Flag
+cmdtree.switch name does = cmdtree.Flag.Flag name None None false false does
+
+{{ An option that carries a value of a kind: ''--name VALUE'' or ''--name=VALUE''. }}
+cmdtree.option : Text -> cmdtree.Kind -> Text -> cmdtree.Flag
+cmdtree.option name kind does = cmdtree.Flag.Flag name None (Some kind) false false does
+
+{{ The option must be given. }}
+cmdtree.required : cmdtree.Flag -> cmdtree.Flag
+cmdtree.required = cmdtree.Flag.required.set true
+
+{{ The option may be given more than once; each value is kept, in order. }}
+cmdtree.repeated : cmdtree.Flag -> cmdtree.Flag
+cmdtree.repeated = cmdtree.Flag.repeated.set true
+
+{{ The option may also be given as ''-c''. }}
+cmdtree.short : Char -> cmdtree.Flag -> cmdtree.Flag
+cmdtree.short c = cmdtree.Flag.short.set (Some c)
+
+{{ An argument that must be given. }}
+cmdtree.arg : Text -> cmdtree.Kind -> Text -> cmdtree.Arg
+cmdtree.arg name kind does = cmdtree.Arg.Arg name kind true does
+
+{{ An argument that may be left out; it comes after the required ones. }}
+cmdtree.optionalArg : Text -> cmdtree.Kind -> Text -> cmdtree.Arg
+cmdtree.optionalArg name kind does = cmdtree.Arg.Arg name kind false does
+
+{{ A form with its options and arguments, running ''run''. }}
+cmdtree.form : [cmdtree.Flag] -> [cmdtree.Arg] -> r -> cmdtree.Form r
+cmdtree.form flags args run = cmdtree.Form.Form flags args None None [] run
+
+{{ The form takes any number of further values of the argument's kind, after its other arguments. }}
+cmdtree.rest : cmdtree.Arg -> cmdtree.Form r -> cmdtree.Form r
+cmdtree.rest a = cmdtree.Form.rest.set (Some a)
+
+{{ Why the form exists. }}
+cmdtree.why : Text -> cmdtree.Form r -> cmdtree.Form r
+cmdtree.why reason = cmdtree.Form.why.set (Some reason)
+
+{{ Command lines that call the form, each written in full from the program's name. }}
+cmdtree.examples : [Text] -> cmdtree.Form r -> cmdtree.Form r
+cmdtree.examples lines = cmdtree.Form.examples.set lines
+
+{{ A command with its group, what it does, its subcommands and its forms. }}
+cmdtree.command : Text -> Text -> Text -> [cmdtree.Node r] -> [cmdtree.Form r] -> cmdtree.Node r
+cmdtree.command name group does children forms = cmdtree.Node.Node name group does children forms

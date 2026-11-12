@@ -1,0 +1,44 @@
+{{ Whether a word is read as an option: it starts with ''-'' and is not ''-'' alone. }}
+cmdtree.isOption : Text -> Boolean
+cmdtree.isOption w = Text.startsWith "-" w && not (w === "-")
+
+{{ Every option the forms of a command take, the first of each name. The tree check holds an option to one shape
+   across a command's forms, so the parser can read the words before it knows the form. }}
+cmdtree.Node.flags : cmdtree.Node r -> [cmdtree.Flag]
+cmdtree.Node.flags node =
+  all = List.flatMap cmdtree.Form.flags (cmdtree.Node.forms node)
+  keep acc f = if List.any (g -> cmdtree.Flag.name g === cmdtree.Flag.name f) acc then acc else acc :+ f
+  List.foldLeft keep [] all
+
+{{ The option a word names, ''--name'' (before any ''='') or ''-c''; nothing for any other word. }}
+cmdtree.Flag.named : [cmdtree.Flag] -> Text -> Optional cmdtree.Flag
+cmdtree.Flag.named flags typed =
+  if Text.startsWith "--" typed then List.find (f -> cmdtree.Flag.name f === Text.drop 2 typed) flags
+  else match Text.toCharList typed with
+    [?-, c] -> List.find (f -> cmdtree.Flag.short f === Some c) flags
+    _ -> None
+
+{{ Split the words after a command's path into the options given, each with its value, and the other words, in
+   order. ''--'' ends the options: every word after it is an argument. }}
+cmdtree.read :
+  [Text] -> [cmdtree.Flag] -> [(Text, Optional Text)] -> [Text] -> [Text]
+  -> Either cmdtree.Refusal ([(Text, Optional Text)], [Text])
+cmdtree.read path flags given words = cases
+  [] -> Right (given, words)
+  "--" +: rest -> Right (given, words ++ rest)
+  w +: rest | cmdtree.isOption w ->
+    (typed, attached) = match Text.split ?= w with
+      t +: (v +: more) | Text.startsWith "--" w -> (t, Some (Text.join "=" (v +: more)))
+      _ -> (w, None)
+    names = List.map (f -> "--" ++ cmdtree.Flag.name f) flags
+    match cmdtree.Flag.named flags typed with
+      None -> Left (cmdtree.Refusal.UnknownOption path typed (cmdtree.nearest typed names))
+      Some f ->
+        name = cmdtree.Flag.name f
+        match (cmdtree.Flag.takes f, attached, rest) with
+          (None, None, _) -> cmdtree.read path flags (given :+ (name, None)) words rest
+          (None, Some v, _) -> Left (cmdtree.Refusal.BadValue path typed "switch" v "a switch takes no value")
+          (Some _, Some v, _) -> cmdtree.read path flags (given :+ (name, Some v)) words rest
+          (Some _, None, v +: more) -> cmdtree.read path flags (given :+ (name, Some v)) words more
+          (Some _, None, []) -> Left (cmdtree.Refusal.MissingValue path typed)
+  w +: rest -> cmdtree.read path flags given (words :+ w) rest

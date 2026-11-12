@@ -1,0 +1,29 @@
+use test check
+
+-- Calls that parse: the path, the form's index, its run value, and the values by name.
+test> cmdtree.tests.parses =
+  use cmdtree.Call Run
+  p line = cmdtree.parse cmdtree.tests.notes (Text.split ?\s line)
+  ran line = match p line with
+    Right (Run path i form parsed) -> Some (path, i, cmdtree.Form.run form, cmdtree.Parsed.values parsed)
+    _ -> None
+  added = match p "add hello world --tag a -p --tag b" with
+    Right (Run _ _ _ parsed) -> (cmdtree.Parsed.switches parsed, cmdtree.Parsed.values parsed)
+    _ -> ([], [])
+  rest = "--not-a-flag"
+  check
+    ((added === (["pin"], [("tag", ["a", "b"]), ("TEXT", ["hello"]), ("MORE", ["world"])]))
+      && (ran "show 12" === Some (["notes", "show"], 0, "show", [("ID", ["12"])]))
+      && (ran "show --last 3" === Some (["notes", "show"], 1, "last", [("last", ["3"])]))
+      && (ran "list --format=json" === Some (["notes", "list"], 0, "list", [("format", ["json"])]))
+      && (ran "sync pull" === Some (["notes", "sync", "pull"], 0, "pull", []))
+      && (ran "add x -- --not-a-flag" === Some (["notes", "add"], 0, "add", [("TEXT", ["x"]), ("MORE", [rest])])))
+
+-- Help is asked for anywhere before ''--''; after it, ''--help'' is a word like any other.
+test> cmdtree.tests.help =
+  p line = cmdtree.parse cmdtree.tests.notes (Text.split ?\s line)
+  check
+    ((p "--help" === Right (cmdtree.Call.Help ["notes"]))
+      && (p "sync -h" === Right (cmdtree.Call.Help ["notes", "sync"]))
+      && (p "list --limit 3 --help" === Right (cmdtree.Call.Help ["notes", "list"]))
+      && Either.isRight (p "add x -- --help"))

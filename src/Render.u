@@ -1,0 +1,34 @@
+{{ How a value of a kind is shown in a synopsis: the choices, or the kind's name in capitals. }}
+cmdtree.Kind.placeholder : cmdtree.Kind -> Text
+cmdtree.Kind.placeholder = cases
+  cmdtree.Kind.Choice words -> Text.join "|" words
+  k -> Text.toUppercase (cmdtree.Kind.name k)
+
+{{ An option as a synopsis shows it: ''--days NAT'', in brackets when it may be left out, with ''...'' when it may be
+   given more than once. }}
+cmdtree.Flag.synopsis : cmdtree.Flag -> Text
+cmdtree.Flag.synopsis f =
+  value = match cmdtree.Flag.takes f with
+    Some k -> " " ++ cmdtree.Kind.placeholder k
+    None -> ""
+  more = if cmdtree.Flag.repeated f then "..." else ""
+  shown = "--" ++ cmdtree.Flag.name f ++ value ++ more
+  if cmdtree.Flag.required f then shown else "[" ++ shown ++ "]"
+
+{{ An argument as a synopsis shows it: ''SESSION'', ''[DAY]'' when it may be left out. }}
+cmdtree.Arg.synopsis : cmdtree.Arg -> Text
+cmdtree.Arg.synopsis a = if cmdtree.Arg.required a then cmdtree.Arg.name a else "[" ++ cmdtree.Arg.name a ++ "]"
+
+{{ One form of the command at ''path'' as a line: the path, the required options, the arguments, the rest, then the
+   options that may be left out. }}
+cmdtree.Form.synopsis : [Text] -> cmdtree.Form r -> Text
+cmdtree.Form.synopsis path form =
+  flags = cmdtree.Form.flags form
+  (needed, left) = (List.filter cmdtree.Flag.required flags, List.filter (f -> not (cmdtree.Flag.required f)) flags)
+  rest = match cmdtree.Form.rest form with
+    Some a -> ["[" ++ cmdtree.Arg.name a ++ "...]"]
+    None -> []
+  words =
+    path ++ List.map cmdtree.Flag.synopsis needed ++ List.map cmdtree.Arg.synopsis (cmdtree.Form.args form) ++ rest
+      ++ List.map cmdtree.Flag.synopsis left
+  Text.join " " words

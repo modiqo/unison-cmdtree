@@ -1,0 +1,31 @@
+use test check
+
+-- Each kind takes its own values and says why it refuses the rest.
+test> cmdtree.tests.kinds =
+  use cmdtree Kind
+  ok k v = cmdtree.Kind.read k v === Right v
+  no k v = Either.isLeft (cmdtree.Kind.read k v)
+  check
+    (ok Kind.Plain "a b" && no Kind.Plain "" && ok Kind.Natural "7" && no Kind.Natural "-7" && no Kind.Natural "x"
+      && ok Kind.Integer "-3" && no Kind.Integer "3.5" && ok (Kind.Choice ["day", "week"]) "week"
+      && no (Kind.Choice ["day", "week"]) "month" && ok Kind.Span "500ms" && ok Kind.Span "7d" && no Kind.Span "7"
+      && no Kind.Span "d" && ok Kind.Day "2024-02-29" && no Kind.Day "2023-02-29" && no Kind.Day "2026-13-01"
+      && no Kind.Day "26-01-01" && ok Kind.JsonText "{\"a\":[1]}" && no Kind.JsonText "{a" )
+
+-- A span is read in milliseconds; a custom kind checks with the program's own function.
+test> cmdtree.tests.spans =
+  upper v = if Text.size v == 3 then Right (Text.toUppercase v) else Left "three letters"
+  custom = cmdtree.Kind.Custom "code" "abc" upper
+  check
+    (cmdtree.Kind.millis "500ms" === Some 500 && cmdtree.Kind.millis "2h" === Some 7200000
+      && cmdtree.Kind.millis "7w" === None && cmdtree.Kind.read custom "abc" === Right "ABC"
+      && cmdtree.Kind.read custom "ab" === Left "three letters" && cmdtree.Kind.name custom === "code"
+      && cmdtree.Kind.sample custom === "abc")
+
+-- The nearest name is offered for a typo, never for a different word.
+test> cmdtree.tests.nearest =
+  names = ["status", "logs", "revert", "enable"]
+  check
+    (cmdtree.distance "kitten" "sitting" === 3 && cmdtree.distance "" "abc" === 3 && cmdtree.distance "abc" "abc" === 0
+      && cmdtree.nearest "stauts" names === Some "status" && cmdtree.nearest "log" names === Some "logs"
+      && cmdtree.nearest "compact" names === None)

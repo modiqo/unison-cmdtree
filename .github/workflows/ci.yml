@@ -1,0 +1,36 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: UCM 1.5.0, checked against its sha256
+        # The digest of ucm-linux-x64.tar.gz from the 1.5.0 release, as GitHub lists it for the asset.
+        env:
+          UCM_SHA256: fcb2ed6284e1f69ba10c4e8a828dd65710f09cf1ee8cb876e732aa9ef566cff4
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP"
+          curl --retry 3 --proto '=https' --proto-redir '=https' -fsSL -o ucm.tar.gz \
+            "https://github.com/unisonweb/unison/releases/download/release%2F1.5.0/ucm-linux-x64.tar.gz"
+          have=$(sha256sum ucm.tar.gz | cut -d' ' -f1)
+          [ "$have" = "$UCM_SHA256" ] || { echo "sha256 mismatch: expected $UCM_SHA256, got $have" >&2; exit 1; }
+          mkdir -p "$HOME/ucm"
+          tar xzf ucm.tar.gz -C "$HOME/ucm"
+          echo "$HOME/ucm" >> "$GITHUB_PATH"
+      - name: The repository's limits
+        run: tools/check.sh
+      - name: Load every file and run every test
+        run: tools/build.sh
+      - name: The load's output, when it failed
+        if: failure()
+        run: cat build/build.output.md 2>/dev/null || cat build/deps.output.md 2>/dev/null || true

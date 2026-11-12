@@ -1,0 +1,25 @@
+use test check
+
+-- The example program passes its own audit: every example calls its form, every sample call parses back, and every
+-- wrong call made from a form is refused for the right reason.
+test> cmdtree.tests.audit = check (cmdtree.audit cmdtree.tests.notes === [])
+
+-- An example that calls another form, or none, is named.
+test> cmdtree.tests.auditExamples =
+  use cmdtree command examples form switch
+  a = examples ["tool run --dry", "tool run --fast"] (form [switch "dry" "Only say."] [] 1)
+  node = command "tool" "" "" [command "run" "" "" [] [a]] []
+  check (cmdtree.audit node === ["tool run (form 1): `tool run --fast` does not call it"])
+
+-- Words are split as a shell splits plain text.
+test> cmdtree.tests.words =
+  check
+    ((cmdtree.words "notes add \"two words\"  x" === ["notes", "add", "two words", "x"])
+      && (cmdtree.words "" === []) && (cmdtree.words "  a  " === ["a"]))
+
+-- A form whose sample argument names a subcommand cannot be called with it: the audit says so.
+test> cmdtree.tests.auditShadow =
+  use cmdtree arg command form
+  node = command "tool" "" "" [command "word" "" "" [] [form [] [] 2]] [form [] [arg "A" cmdtree.Kind.Plain ""] 1]
+  fault = "tool (form 1): `tool word`, made of its samples, does not parse back to it"
+  check (List.contains fault (cmdtree.audit node))

@@ -1,0 +1,70 @@
+{{ Wrong calls made from a form's own samples, each with the refusal it must meet: an unknown option, a bad value for
+   each option and argument whose kind refuses one, no arguments where one is required, and a word past the last
+   argument. Then the calls that must choose another form (''cmdtree.audit.elsewhere''). }}
+cmdtree.audit.wrong : cmdtree.Node r -> ([Text], Nat, cmdtree.Form r) -> Text -> [Text]
+cmdtree.audit.wrong root target at = match target with
+  (path, i, form) ->
+    use cmdtree.Refusal BadValue MissingRequired TooManyArguments UnknownCommand UnknownOption
+    head = List.drop 1 path
+    expect words want why = match cmdtree.parse root (head ++ words) with
+      Left r | want r -> []
+      _ -> [at ++ ": `" ++ Text.join " " (cmdtree.Node.name root +: (head ++ words)) ++ "` " ++ why]
+    (flags, args) = cmdtree.Form.parts (_ k -> cmdtree.Kind.sample k) form
+    sample = List.flatMap at2 flags ++ List.flatMap at2 args
+    with1 name v = cmdtree.Form.parts (n k -> if n === name then v else cmdtree.Kind.sample k) form
+    joined = cases (fs, as) -> List.flatMap at2 fs ++ List.flatMap at2 as
+    isUnknown = cases
+      UnknownOption _ "--zz-none" _ -> true
+      _ -> false
+    bad name typed kind = match cmdtree.Kind.bad kind with
+      Some v ->
+        isBad = cases
+          BadValue _ n _ given _ -> (n === typed) && (given === v)
+          _ -> false
+        expect (joined (with1 name v)) isBad ("was not refused as a bad value of " ++ typed)
+      None -> []
+    badFlag f = match cmdtree.Flag.takes f with
+      Some k -> bad (cmdtree.Flag.name f) ("--" ++ cmdtree.Flag.name f) k
+      None -> []
+    badArg a = bad (cmdtree.Arg.name a) (cmdtree.Arg.name a) (cmdtree.Arg.kind a)
+    noArgs = match List.find cmdtree.Arg.required (cmdtree.Form.args form) with
+      Some a ->
+        isMissing = cases
+          MissingRequired _ n -> n === cmdtree.Arg.name a
+          _ -> false
+        expect (List.flatMap at2 flags) isMissing ("was not refused for want of " ++ cmdtree.Arg.name a)
+      None -> []
+    isExtra = cases
+      TooManyArguments _ "zz-extra" -> true
+      UnknownCommand _ "zz-extra" _ -> true
+      _ -> false
+    extra = match cmdtree.Form.rest form with
+      Some _ -> []
+      None -> expect (sample :+ "zz-extra") isExtra "took a word past its arguments"
+    allArgs = cmdtree.Form.args form ++ Optional.toList (cmdtree.Form.rest form)
+    expect (sample :+ "--zz-none") isUnknown "was not refused as an unknown option"
+      ++ List.flatMap badFlag (cmdtree.Form.flags form)
+      ++ List.flatMap badArg allArgs
+      ++ noArgs
+      ++ extra
+      ++ cmdtree.audit.elsewhere root target at
+
+{{ Calls that must not run the form: each required option dropped, and each option only another form of the command
+   takes added. }}
+cmdtree.audit.elsewhere : cmdtree.Node r -> ([Text], Nat, cmdtree.Form r) -> Text -> [Text]
+cmdtree.audit.elsewhere root target at = match target with
+  (path, i, form) ->
+    head = List.drop 1 path
+    ran words =
+      shown = Text.join " " (cmdtree.Node.name root +: (head ++ words))
+      if cmdtree.audit.runs root path i (head ++ words) then [at ++ ": `" ++ shown ++ "` ran it"] else []
+    (flags, args) = cmdtree.Form.parts (_ k -> cmdtree.Kind.sample k) form
+    without f = List.filter (p -> not (at1 p === cmdtree.Flag.name f)) flags
+    drop f = ran (List.flatMap at2 (without f) ++ List.flatMap at2 args)
+    node = Optional.getOrElse root (cmdtree.Node.at path root)
+    mine f = List.any (g -> cmdtree.Flag.name g === cmdtree.Flag.name f) (cmdtree.Form.flags form)
+    theirs = List.filter (f -> not (mine f)) (cmdtree.Node.flags node)
+    added f =
+      (more, _) = cmdtree.Form.parts (_ k -> cmdtree.Kind.sample k) (cmdtree.Form.flags.set [f] form)
+      ran (List.flatMap at2 flags ++ List.flatMap at2 args ++ List.flatMap at2 more)
+    List.flatMap drop (List.filter cmdtree.Flag.required (cmdtree.Form.flags form)) ++ List.flatMap added theirs

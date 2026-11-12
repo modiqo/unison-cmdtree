@@ -1,0 +1,46 @@
+{{ What a value of an option or an argument is read as. The parser checks every value against its kind before any
+   handler runs, so a handler never sees a value of the wrong shape.
+
+   * ''Plain'': any text that is not empty.
+   * ''Natural'': a ''Nat'', such as ''7''.
+   * ''Integer'': an ''Int'', such as ''-3'' (given as ''--offset=-3'', since a word that starts with ''-'' is read as
+     an option).
+   * ''Choice'': one of the words listed, such as ''Choice ["day", "week"]''.
+   * ''Span'': a length of time, a whole number and a unit: ''ms'', ''s'', ''m'', ''h'' or ''d'' (''500ms'', ''7d'').
+   * ''Day'': a calendar day, ''YYYY-MM-DD''.
+   * ''JsonText'': JSON text.
+   * ''Custom'': the program's own kind: a name for help and the JSON export, a sample value the tests use, and a
+     check that gives the value as the handler will read it, or says why it is wrong. }}
+type cmdtree.Kind
+  = Plain
+  | Natural
+  | Integer
+  | Choice [Text]
+  | Span
+  | Day
+  | JsonText
+  | Custom Text Text (Text -> Either Text Text)
+
+{{ A kind's name, as help and the JSON export show it. }}
+cmdtree.Kind.name : cmdtree.Kind -> Text
+cmdtree.Kind.name = cases
+  cmdtree.Kind.Plain -> "text"
+  cmdtree.Kind.Natural -> "nat"
+  cmdtree.Kind.Integer -> "int"
+  cmdtree.Kind.Choice _ -> "choice"
+  cmdtree.Kind.Span -> "span"
+  cmdtree.Kind.Day -> "day"
+  cmdtree.Kind.JsonText -> "json"
+  cmdtree.Kind.Custom name _ _ -> name
+
+{{ A value of the kind, for the tests that render a form and parse it again. }}
+cmdtree.Kind.sample : cmdtree.Kind -> Text
+cmdtree.Kind.sample = cases
+  cmdtree.Kind.Plain -> "word"
+  cmdtree.Kind.Natural -> "7"
+  cmdtree.Kind.Integer -> "12"
+  cmdtree.Kind.Choice words -> Optional.getOrElse "" (List.head words)
+  cmdtree.Kind.Span -> "5m"
+  cmdtree.Kind.Day -> "2026-01-02"
+  cmdtree.Kind.JsonText -> "{}"
+  cmdtree.Kind.Custom _ sample _ -> sample

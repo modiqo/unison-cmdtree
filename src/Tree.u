@@ -1,0 +1,23 @@
+{{ An option of a form: ''--name'', or ''-c'' when it has a short name. A ''Flag'' that ''takes'' no kind is a
+   switch, given or not; one that takes a kind carries a value (''--days 7'' or ''--days=7''). A ''required'' option
+   must be given; a ''repeated'' one may be given more than once, each value kept in order. }}
+type cmdtree.Flag =
+  { name : Text, short : Optional Char, takes : Optional cmdtree.Kind, required : Boolean, repeated : Boolean,
+    does : Text }
+
+{{ A word of a form that is not an option, by its place: ''SESSION'' in ''tool show SESSION''. Required arguments
+   come before optional ones. }}
+type cmdtree.Arg = { name : Text, kind : cmdtree.Kind, required : Boolean, does : Text }
+
+{{ One way to call a command: its options, its arguments in order, and, when it takes any number more, the kind of
+   the rest. ''why'' says why the form exists, for a program that keeps that next to its forms. ''examples'' are
+   whole command lines a person could type, each parsed by the tests to this form. ''run'' is whatever the program
+   runs for this form; the library only hands it back. }}
+type cmdtree.Form r =
+  { flags : [cmdtree.Flag], args : [cmdtree.Arg], rest : Optional cmdtree.Arg, why : Optional Text,
+    examples : [Text], run : r }
+
+{{ A command: its name, the group help lists it under, what it does, its subcommands, and the forms it takes when
+   it is called with no subcommand. A program is its root ''Node''. }}
+type cmdtree.Node r =
+  { name : Text, group : Text, does : Text, children : [cmdtree.Node r], forms : [cmdtree.Form r] }

@@ -1,0 +1,71 @@
+{{ Apply ''f'' to each item in order; the first ''Left'' stops it. }}
+cmdtree.collect : (a -> Either e b) -> [a] -> Either e [b]
+cmdtree.collect f xs =
+  step acc x = match acc with
+    Left e -> Left e
+    Right ys -> match f x with
+      Left e -> Left e
+      Right y -> Right (ys :+ y)
+  List.foldLeft step (Right []) xs
+
+{{ One value read as its kind, or the refusal that names it. }}
+cmdtree.bind.value : [Text] -> Text -> cmdtree.Kind -> Text -> Either cmdtree.Refusal Text
+cmdtree.bind.value path name kind given = match cmdtree.Kind.read kind given with
+  Right v -> Right v
+  Left why -> Left (cmdtree.Refusal.BadValue path name (cmdtree.Kind.name kind) given why)
+
+{{ One option of the chosen form against what the call gave: the switch given, the values read, or the refusal. }}
+cmdtree.bind.flag :
+  [Text] -> [(Text, Optional Text)] -> cmdtree.Flag -> Either cmdtree.Refusal ([Text], [(Text, [Text])])
+cmdtree.bind.flag path given f =
+  name = cmdtree.Flag.name f
+  typed = "--" ++ name
+  occurrences = List.flatMap (cases (n, v) -> if n === name then [v] else []) given
+  valueOf = cases
+    Some v -> [v]
+    None -> []
+  texts = List.flatMap valueOf occurrences
+  count = List.size occurrences
+  if Nat.gt count 1 && not (cmdtree.Flag.repeated f) then Left (cmdtree.Refusal.GivenTwice path typed)
+  else if count == 0 && cmdtree.Flag.required f then Left (cmdtree.Refusal.MissingRequired path typed)
+  else match cmdtree.Flag.takes f with
+    None -> Right (if count == 0 then [] else [name], [])
+    Some kind -> match cmdtree.collect (cmdtree.bind.value path typed kind) texts with
+      Left r -> Left r
+      Right [] -> Right ([], [])
+      Right vs -> Right ([], [(name, vs)])
+
+{{ The other words of the call against the form's arguments, in order, then its rest. }}
+cmdtree.bind.args : [Text] -> cmdtree.Form r -> [Text] -> Either cmdtree.Refusal [(Text, [Text])]
+cmdtree.bind.args path form words =
+  args = cmdtree.Form.args form
+  one = cases
+    (a, j) -> match List.at j words with
+      Some w ->
+        read = cmdtree.bind.value path (cmdtree.Arg.name a) (cmdtree.Arg.kind a) w
+        Either.mapRight (v -> [(cmdtree.Arg.name a, [v])]) read
+      None | cmdtree.Arg.required a -> Left (cmdtree.Refusal.MissingRequired path (cmdtree.Arg.name a))
+      None -> Right []
+  extra = List.drop (List.size args) words
+  rest = match (extra, cmdtree.Form.rest form) with
+    ([], _) -> Right []
+    (w +: _, None) -> Left (cmdtree.Refusal.TooManyArguments path w)
+    (ws, Some a) ->
+      read = cmdtree.bind.value path (cmdtree.Arg.name a) (cmdtree.Arg.kind a)
+      Either.mapRight (vs -> [(cmdtree.Arg.name a, vs)]) (cmdtree.collect read ws)
+  match (cmdtree.collect one (List.indexed args), rest) with
+    (Left r, _) -> Left r
+    (_, Left r) -> Left r
+    (Right parts, Right more) -> Right (List.join parts ++ more)
+
+{{ Bind a call to the chosen form: its options, then its arguments. }}
+cmdtree.bind :
+  [Text] -> Nat -> cmdtree.Form r -> [(Text, Optional Text)] -> [Text] -> Either cmdtree.Refusal (cmdtree.Call r)
+cmdtree.bind path i form given words =
+  match cmdtree.collect (cmdtree.bind.flag path given) (cmdtree.Form.flags form) with
+    Left r -> Left r
+    Right parts -> match cmdtree.bind.args path form words with
+      Left r -> Left r
+      Right positional ->
+        parsed = cmdtree.Parsed.Parsed (List.flatMap at1 parts) (List.flatMap at2 parts ++ positional)
+        Right (cmdtree.Call.Run path i form parsed)

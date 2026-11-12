@@ -1,0 +1,25 @@
+-- A small program for the tests: notes, with a command of two forms told apart by a required option, a command that
+-- only has subcommands, and every kind of option.
+cmdtree.tests.notes : cmdtree.Node Text
+cmdtree.tests.notes =
+  use cmdtree arg command examples form option optionalArg repeated required short switch
+  use cmdtree.Kind Choice Natural Plain Span Day
+  add =
+    flags = [repeated (option "tag" Plain "A tag."), short ?p (switch "pin" "Keep it at the top.")]
+    shape = cmdtree.rest (arg "MORE" Plain "More words.") (form flags [arg "TEXT" Plain "The note."] "add")
+    command "add" "Write" "Add a note." [] [examples ["notes add milk --tag shop --pin"] shape]
+  list =
+    flags =
+      [ option "since" Span "How far back."
+      , option "limit" Natural "How many."
+      , option "format" (Choice ["text", "json"]) "How to print."
+      ]
+    command "list" "Read" "List notes." [] [examples ["notes list --since 7d --limit 3"] (form flags [] "list")]
+  show =
+    byId = examples ["notes show 12"] (form [] [arg "ID" Natural "The note."] "show")
+    last = examples ["notes show --last 2"] (form [required (option "last" Natural "The newest ones.")] [] "last")
+    command "show" "Read" "Show notes." [] [byId, last]
+  push = command "push" "Sync" "Send notes." [] [form [switch "force" "Overwrite."] [] "push"]
+  pull = command "pull" "Sync" "Fetch notes." [] [form [] [optionalArg "DAY" Day "From this day."] "pull"]
+  sync = command "sync" "Sync" "Sync notes." [push, pull] []
+  command "notes" "" "Keep notes." [add, list, show, sync] []

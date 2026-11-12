@@ -1,0 +1,28 @@
+use test check
+
+-- The example program has no faults; each broken tree is refused with the fault that breaks it.
+test> cmdtree.tests.faults =
+  use cmdtree arg command form option optionalArg required short switch
+  use cmdtree.Kind Natural Plain
+  one forms = cmdtree.faults (command "x" "" "" [] forms)
+  says forms fault = List.contains fault (one forms)
+  same = [form [option "a" Plain ""] [] 1, form [switch "b" ""] [] 2]
+  told = [form [required (option "a" Plain "")] [] 1, form [switch "b" ""] [] 2]
+  shapes = [form [required (option "n" Natural "")] [] 1, form [option "n" Plain "", switch "m" ""] [] 2]
+  twins = command "x" "" "" [command "y" "" "" [] same, command "y" "" "" [] told] []
+  dashed = command "x" "" "" [command "-y" "" "" [] told] []
+  late = [form [] [optionalArg "A" Plain "", arg "B" Plain ""] 1]
+  check
+    (List.isEmpty (cmdtree.faults cmdtree.tests.notes)
+      && says same "x: forms 1 and 2 cannot be told apart" && List.isEmpty (one told)
+      && says shapes "x: --n has two shapes in its forms"
+      && says [form [switch "help" ""] [] 1] "x (form 1): --help and -h are kept for help"
+      && says [form [short ?h (switch "hush" "")] [] 1] "x (form 1): --help and -h are kept for help"
+      && says [form [required (switch "s" "")] [] 1]
+        "x (form 1): a required switch: a switch that must be given says nothing"
+      && says [form [option "a" Plain "", option "a" Plain ""] [] 1] "x (form 1): two options named --a"
+      && says late "x (form 1): a required argument after one that may be left out"
+      && says [form [option "A" Plain ""] [arg "A" Plain ""] 1] "x (form 1): an argument named like an option"
+      && (cmdtree.faults (command "x" "" "" [] []) === ["x: no forms and no subcommands"])
+      && List.contains "x: two subcommands named y" (cmdtree.faults twins)
+      && List.contains "x -y: a command name must be one word that does not start with -" (cmdtree.faults dashed))

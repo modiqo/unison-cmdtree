@@ -1,0 +1,35 @@
+{{ Why a call was refused, as a value: the program says it in its own words (''cmdtree.Refusal.say'' gives plain
+   English). Each names the command path it was refused at, from the program's name.
+
+   * ''UnknownCommand path word nearest'': ''word'' is no subcommand of ''path''; ''nearest'' is the closest one.
+   * ''MissingCommand path subcommands'': ''path'' needs a subcommand and none was given.
+   * ''UnknownOption path flag nearest'': no form of ''path'' takes ''flag''.
+   * ''OptionOfAnotherForm path flag other'': ''flag'' belongs to another form of ''path'' (its synopsis), and the
+     options given with it choose this one.
+   * ''MissingValue path flag'': ''flag'' takes a value and none followed it.
+   * ''MissingRequired path name'': the required option or argument ''name'' was not given.
+   * ''BadValue path name kind given why'': ''given'' is not a value of ''kind'' for ''name''.
+   * ''TooManyArguments path word'': ''word'' is past the arguments the form takes.
+   * ''GivenTwice path flag'': ''flag'' was given twice and is not repeated.
+   * ''NotFound kind given'': a value of the right shape that is not there; a handler's refusal, not the parser's. }}
+type cmdtree.Refusal
+  = UnknownCommand [Text] Text (Optional Text)
+  | MissingCommand [Text] [Text]
+  | UnknownOption [Text] Text (Optional Text)
+  | OptionOfAnotherForm [Text] Text Text
+  | MissingValue [Text] Text
+  | MissingRequired [Text] Text
+  | BadValue [Text] Text Text Text Text
+  | TooManyArguments [Text] Text
+  | GivenTwice [Text] Text
+  | NotFound Text Text
+
+{{ The values a call gave, by name: an option's name without its dashes, an argument's name as the form spells it.
+   ''switches'' lists the switches given; ''values'' each option or argument given with its values in order. }}
+type cmdtree.Parsed = { switches : [Text], values : [(Text, [Text])] }
+
+{{ What a call asks for: to run a form of the command at ''path'', the form's index among the command's forms, or
+   the help of the command at ''path'' (''--help'' or ''-h'' was given). }}
+type cmdtree.Call r
+  = Run [Text] Nat (cmdtree.Form r) cmdtree.Parsed
+  | Help [Text]

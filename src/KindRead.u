@@ -1,0 +1,46 @@
+{{ Read a value as its kind: the value as the handler will read it, or why it is not one. }}
+cmdtree.Kind.read : cmdtree.Kind -> Text -> Either Text Text
+cmdtree.Kind.read kind given =
+  ok b why = if b then Right given else Left why
+  match kind with
+    _ | given === "" -> Left "it is empty"
+    cmdtree.Kind.Plain -> Right given
+    cmdtree.Kind.Natural -> ok (Optional.isSome (Nat.fromText given)) "it is not a whole number of 0 or more"
+    cmdtree.Kind.Integer -> ok (Optional.isSome (Int.fromText given)) "it is not a whole number"
+    cmdtree.Kind.Choice words -> ok (List.contains given words) ("it is not one of " ++ Text.join ", " words)
+    cmdtree.Kind.Span -> ok (Optional.isSome (cmdtree.Kind.millis given)) "it is not a number and ms, s, m, h or d"
+    cmdtree.Kind.Day -> ok (cmdtree.Kind.isDay given) "it is not a day written YYYY-MM-DD"
+    cmdtree.Kind.JsonText ->
+      ok (Either.isRight (lib.unison_json_1_4_2.core.Json.tryFromText given)) "it is not JSON"
+    cmdtree.Kind.Custom _ _ check -> check given
+
+{{ A ''Span'' in milliseconds: ''500ms'' is 500, ''7d'' is 604800000; nothing when it is not a span. }}
+cmdtree.Kind.millis : Text -> Optional Nat
+cmdtree.Kind.millis given =
+  digit c = (Char.toNat c >= 48) && (Char.toNat c <= 57)
+  digits = Text.takeWhile digit given
+  unit = Text.drop (Text.size digits) given
+  scale = match unit with
+    "ms" -> Some 1
+    "s" -> Some 1000
+    "m" -> Some 60000
+    "h" -> Some 3600000
+    "d" -> Some 86400000
+    _ -> None
+  match (Nat.fromText digits, scale) with
+    (Some n, Some k) -> Some (n * k)
+    _ -> None
+
+{{ Whether the text is a calendar day written ''YYYY-MM-DD'', the day within its month (29 February in a leap year). }}
+cmdtree.Kind.isDay : Text -> Boolean
+cmdtree.Kind.isDay given = match Text.split ?- given with
+  [y, m, d] | (Text.size y == 4) && (Text.size m == 2) && (Text.size d == 2) ->
+    match (Nat.fromText y, Nat.fromText m, Nat.fromText d) with
+      (Some year, Some month, Some day) ->
+        leap = (Nat.mod year 4 == 0 && Nat.mod year 100 != 0) || Nat.mod year 400 == 0
+        long = [1, 3, 5, 7, 8, 10, 12]
+        last =
+          if month == 2 then (if leap then 29 else 28) else if List.contains month long then 31 else 30
+        month >= 1 && month <= 12 && day >= 1 && day <= last
+      _ -> false
+  _ -> false

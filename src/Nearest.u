@@ -1,0 +1,33 @@
+{{ How many single-character insertions, deletions and replacements turn one text into the other. }}
+cmdtree.distance : Text -> Text -> Nat
+cmdtree.distance a b =
+  ys = Text.toCharList b
+  first = List.range 0 (List.size ys + 1)
+  next prev = cases (x, i) -> cmdtree.distance.row prev ys x (i + 1)
+  Optional.getOrElse 0 (List.last (List.foldLeft next first (List.indexed (Text.toCharList a))))
+
+{{ One row of the distance table: the row above, the second text's characters, this row's character and its start. }}
+cmdtree.distance.row : [Nat] -> [Char] -> Char -> Nat -> [Nat]
+cmdtree.distance.row prev ys x start =
+  step acc = cases
+    (y, j) ->
+      left = Optional.getOrElse 0 (List.last acc)
+      up = Optional.getOrElse 0 (List.at (j + 1) prev)
+      diag = Optional.getOrElse 0 (List.at j prev)
+      cost = if x === y then 0 else 1
+      acc :+ Nat.min (Nat.min (up + 1) (left + 1)) (diag + cost)
+  List.foldLeft step [start] (List.indexed ys)
+
+{{ The candidate closest to ''word'', when it is within two edits, or a third of the word's length if that is more;
+   the first of equals wins. A suggestion for a typo, never a guess at a different word. }}
+cmdtree.nearest : Text -> [Text] -> Optional Text
+cmdtree.nearest word candidates =
+  limit = Nat.max 2 (Text.size word / 3)
+  closer best = cases
+    (d, c) -> match best with
+      Some (bd, _) | Nat.gteq d bd -> best
+      _ -> Some (d, c)
+  scored = List.map (c -> (cmdtree.distance word c, c)) candidates
+  match List.foldLeft closer None scored with
+    Some (d, c) | Nat.lteq d limit -> Some c
+    _ -> None
