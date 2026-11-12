@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0 — 2026-11-12
+
+The first release, on Unison Share as `@modiqo/cmdtree`, licensed MIT OR Apache-2.0.
+
 - The tree: `Node`, `Form`, `Flag`, `Arg` and `Kind`, with builders (`command`, `form`, `option`, `switch`, `arg`,
   `optionalArg`, `required`, `repeated`, `short`, `rest`, `why`, `examples`).
 - `parse`: subcommands first, then the command's options and arguments; `--name=value` and `--name value`, `-c`,
