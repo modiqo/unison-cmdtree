@@ -1,0 +1,20 @@
+use test check
+
+-- Prose: paragraphs at blank lines, backticks as code; a command's Doc has its sections.
+test> cmdtree.tests.prose =
+  use Doc Code Paragraph UntitledSection Word
+  got = cmdtree.prose "Run `olki tune` now\nand then.\n\nDone."
+  want = UntitledSection [Paragraph [Word "Run", Code (Word "olki tune"), Word "now", Word "and", Word "then."]
+    , Paragraph [Word "Done."]]
+  shown = match cmdtree.toDoc cmdtree.tests.notes ["notes", "show"] with
+    Some (Doc.Section (Code (Word title)) body) -> Some (title, List.size body)
+    _ -> None
+  check ((got === want) && (shown === Some ("notes show", 5)) && (cmdtree.toDoc cmdtree.tests.notes ["x"] === None))
+
+-- The Markdown has a section per command, its synopses fenced, and tables of options, arguments and commands.
+test> cmdtree.tests.markdown =
+  md = cmdtree.markdown cmdtree.tests.notes
+  show = "## `notes show`\n\nShow notes.\n\n```\nnotes show ID\nnotes show --last NAT\n```\n\n| Option | |\n|---|---|\n"
+  check
+    (Text.startsWith "## `notes`\n\nKeep notes.\n\n| Command | |" md && Text.contains show md
+      && Text.contains "| `--format text\\|json` | How to print. |" md && Text.contains "## `notes sync pull`" md)

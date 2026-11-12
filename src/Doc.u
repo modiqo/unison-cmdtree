@@ -1,0 +1,44 @@
+{{ Help text with its one markup as a ''Doc'': a blank line between paragraphs, and text in backticks as code. }}
+cmdtree.prose : Text -> Doc
+cmdtree.prose text =
+  paragraph p =
+    pieces = List.indexed (Text.split ?` p)
+    piece = cases
+      (t, i) | Nat.mod i 2 == 1 -> [Doc.Code (Doc.Word t)]
+      (t, _) -> List.map Doc.Word (List.filter (w -> not (w === "")) (Text.split ?\s t))
+    Doc.Paragraph (List.flatMap piece pieces)
+  Doc.UntitledSection (List.map paragraph (cmdtree.paragraphs text))
+
+{{ Text split at its blank lines; the lines of one paragraph are joined by spaces. }}
+cmdtree.paragraphs : Text -> [Text]
+cmdtree.paragraphs text =
+  step acc line = match acc with
+    (current, done) | Text.trim line === "" -> ([], if List.isEmpty current then done else done :+ current)
+    (current, done) -> (current :+ Text.trim line, done)
+  (last, done) = List.foldLeft step ([], []) (Text.split ?\n text)
+  List.map (Text.join " ") (if List.isEmpty last then done else done :+ last)
+
+{{ The help of the command at ''path'' as a ''Doc'', for UCM and Unison Share: what it does, each form's synopsis,
+   a table of its options and of its arguments, its subcommands and its examples. Nothing when the path names no
+   command. }}
+cmdtree.toDoc : cmdtree.Node r -> [Text] -> Optional Doc
+cmdtree.toDoc root path = match cmdtree.Node.at path root with
+  None -> None
+  Some node ->
+    forms = cmdtree.Node.forms node
+    code lines = Doc.CodeBlock "" (Doc.Word (Text.join "\n" lines))
+    row a b = [Doc.Code (Doc.Word a), cmdtree.prose b]
+    flagRow f = row (cmdtree.Flag.synopsis (cmdtree.Flag.required.set true f)) (cmdtree.Flag.does f)
+    args = List.distinct (List.flatMap (f -> cmdtree.Form.args f ++ Optional.toList (cmdtree.Form.rest f)) forms)
+    part title items = if List.isEmpty items then [] else [Doc.Section (Doc.Word title) items]
+    table rows = if List.isEmpty rows then [] else [Doc.Table rows]
+    children = List.map (c -> row (cmdtree.Node.name c) (cmdtree.Node.does c)) (cmdtree.Node.children node)
+    examples = List.flatMap cmdtree.Form.examples forms
+    body =
+      [cmdtree.prose (cmdtree.Node.does node)]
+        ++ part "Usage" (if List.isEmpty forms then [] else [code (List.map (cmdtree.Form.synopsis path) forms)])
+        ++ part "Options" (table (List.map flagRow (cmdtree.Node.flags node)))
+        ++ part "Arguments" (table (List.map (a -> row (cmdtree.Arg.name a) (cmdtree.Arg.does a)) args))
+        ++ part "Commands" (table children)
+        ++ part "Examples" (if List.isEmpty examples then [] else [code examples])
+    Some (Doc.Section (Doc.Code (Doc.Word (Text.join " " path))) body)

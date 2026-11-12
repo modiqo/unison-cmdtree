@@ -1,0 +1,36 @@
+use test check
+
+-- A command's help: what it does, each form's synopsis, its options and arguments, its examples.
+test> cmdtree.tests.helpShow =
+  want =
+    [ "notes show: Show notes.", "", "Usage:", "  notes show ID", "  notes show --last NAT", "", "Options:"
+    , "  --last NAT  The newest ones.", "", "Arguments:", "  ID  The note.", "", "Examples:", "  notes show 12"
+    , "  notes show --last 2"
+    ]
+  check (cmdtree.help cmdtree.tests.notes ["notes", "show"] === Some (Text.join "\n" want))
+
+-- The program's help lists its commands by group; short names and repeated options show in a command's help.
+test> cmdtree.tests.helpTop =
+  top =
+    [ "notes: Keep notes.", "", "Write:", "  add  Add a note.", "", "Read:", "  list  List notes."
+    , "  show  Show notes.", "", "Sync:", "  sync  Sync notes."
+    ]
+  add = Optional.getOrElse "" (cmdtree.help cmdtree.tests.notes ["notes", "add"])
+  check
+    ((cmdtree.help cmdtree.tests.notes ["notes"] === Some (Text.join "\n" top))
+      && Text.contains "  notes add TEXT [MORE...] [--tag TEXT...] [--pin]" add
+      && Text.contains "  -p, --pin      Keep it at the top." add
+      && (cmdtree.help cmdtree.tests.notes ["notes", "nope"] === None))
+
+-- Each refusal in plain English.
+test> cmdtree.tests.say =
+  use cmdtree.Refusal BadValue MissingCommand OptionOfAnotherForm UnknownOption
+  say = cmdtree.Refusal.say
+  check
+    ((say (UnknownOption ["notes", "list"] "--limt" (Some "--limit"))
+        === "notes list: unknown option --limt; did you mean --limit?")
+      && (say (MissingCommand ["notes", "sync"] ["push", "pull"]) === "notes sync: needs a command: push, pull")
+      && (say (BadValue ["notes", "list"] "--limit" "nat" "x" "it is not a whole number of 0 or more")
+        === "notes list: --limit takes a nat, and x: it is not a whole number of 0 or more")
+      && (say (OptionOfAnotherForm ["stats"] "--all" "stats SESSION [--all]")
+        === "stats: --all goes with another form: stats SESSION [--all]"))

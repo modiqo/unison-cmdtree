@@ -1,0 +1,62 @@
+{{ The tree as JSON, for a program in another language to build its own view from: a launcher's parser, shell
+   completions, a documentation page. ''cmdtree'' says the export's version; everything a renderer here uses is in
+   it, with each form's synopsis as this library renders it. A form's ''run'' is the program's own and is left out. }}
+cmdtree.export : cmdtree.Node r -> lib.unison_json_1_4_2.core.Json
+cmdtree.export root =
+  use lib.unison_json_1_4_2.core Json
+  Json.object [("cmdtree", Json.nat 1), ("tree", cmdtree.export.node [] root)]
+
+{{ A kind as JSON: its name, a sample value, and the choices of a ''Choice''. }}
+cmdtree.export.kind : cmdtree.Kind -> lib.unison_json_1_4_2.core.Json
+cmdtree.export.kind k =
+  use lib.unison_json_1_4_2.core Json
+  choices = match k with
+    cmdtree.Kind.Choice words -> [("choices", Json.array (List.map Json.text words))]
+    _ -> []
+  Json.object ([("name", Json.text (cmdtree.Kind.name k)), ("sample", Json.text (cmdtree.Kind.sample k))] ++ choices)
+
+{{ An option as JSON. }}
+cmdtree.export.flag : cmdtree.Flag -> lib.unison_json_1_4_2.core.Json
+cmdtree.export.flag f =
+  use lib.unison_json_1_4_2.core Json
+  short = Optional.getOrElse Json.null (Optional.map (c -> Json.text (Char.toText c)) (cmdtree.Flag.short f))
+  takes = Optional.getOrElse Json.null (Optional.map cmdtree.export.kind (cmdtree.Flag.takes f))
+  Json.object
+    [ ("name", Json.text (cmdtree.Flag.name f)), ("short", short), ("takes", takes)
+    , ("required", Json.boolean (cmdtree.Flag.required f)), ("repeated", Json.boolean (cmdtree.Flag.repeated f))
+    , ("does", Json.text (cmdtree.Flag.does f))
+    ]
+
+{{ An argument as JSON. }}
+cmdtree.export.arg : cmdtree.Arg -> lib.unison_json_1_4_2.core.Json
+cmdtree.export.arg a =
+  use lib.unison_json_1_4_2.core Json
+  Json.object
+    [ ("name", Json.text (cmdtree.Arg.name a)), ("kind", cmdtree.export.kind (cmdtree.Arg.kind a))
+    , ("required", Json.boolean (cmdtree.Arg.required a)), ("does", Json.text (cmdtree.Arg.does a))
+    ]
+
+{{ A form of the command at ''path'' as JSON, with its synopsis. }}
+cmdtree.export.form : [Text] -> cmdtree.Form r -> lib.unison_json_1_4_2.core.Json
+cmdtree.export.form path form =
+  use lib.unison_json_1_4_2.core Json
+  rest = Optional.getOrElse Json.null (Optional.map cmdtree.export.arg (cmdtree.Form.rest form))
+  why = Optional.getOrElse Json.null (Optional.map Json.text (cmdtree.Form.why form))
+  Json.object
+    [ ("synopsis", Json.text (cmdtree.Form.synopsis path form))
+    , ("flags", Json.array (List.map cmdtree.export.flag (cmdtree.Form.flags form)))
+    , ("args", Json.array (List.map cmdtree.export.arg (cmdtree.Form.args form))), ("rest", rest), ("why", why)
+    , ("examples", Json.array (List.map Json.text (cmdtree.Form.examples form)))
+    ]
+
+{{ A command and everything under it as JSON, with the path above it. }}
+cmdtree.export.node : [Text] -> cmdtree.Node r -> lib.unison_json_1_4_2.core.Json
+cmdtree.export.node above node =
+  use lib.unison_json_1_4_2.core Json
+  path = above :+ cmdtree.Node.name node
+  Json.object
+    [ ("name", Json.text (cmdtree.Node.name node)), ("group", Json.text (cmdtree.Node.group node))
+    , ("does", Json.text (cmdtree.Node.does node))
+    , ("forms", Json.array (List.map (cmdtree.export.form path) (cmdtree.Node.forms node)))
+    , ("children", Json.array (List.map (cmdtree.export.node path) (cmdtree.Node.children node)))
+    ]

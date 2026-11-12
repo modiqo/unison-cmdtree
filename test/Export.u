@@ -1,0 +1,18 @@
+use test check
+
+-- The export carries its version, every command, and each form with its synopsis, options and kinds; its text
+-- reads back as the same JSON.
+test> cmdtree.tests.export =
+  use lib.unison_json_1_4_2.core Json
+  json = cmdtree.export cmdtree.tests.notes
+  text = Json.toText json
+  last =
+    "{\"synopsis\":\"notes show --last NAT\",\"flags\":[{\"name\":\"last\",\"short\":null,"
+      ++ "\"takes\":{\"name\":\"nat\",\"sample\":\"7\"},\"required\":true,\"repeated\":false,"
+      ++ "\"does\":\"The newest ones.\"}],\"args\":[],\"rest\":null,\"why\":null,"
+      ++ "\"examples\":[\"notes show --last 2\"]}"
+  choice = "\"takes\":{\"name\":\"choice\",\"sample\":\"text\",\"choices\":[\"text\",\"json\"]}"
+  check
+    (Text.startsWith "{\"cmdtree\":1,\"tree\":{\"name\":\"notes\"" text && Text.contains last text
+      && Text.contains choice text && Text.contains "\"short\":\"p\"" text
+      && (Json.tryFromText text === Right json))

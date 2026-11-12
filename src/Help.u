@@ -1,0 +1,42 @@
+{{ Lines of two columns, the first padded to the widest so the second starts at one place. }}
+cmdtree.columns : [(Text, Text)] -> [Text]
+cmdtree.columns rows =
+  wide = List.foldLeft (n r -> Nat.max n (Text.size (at1 r))) 0 rows
+  pad t = t ++ Text.repeat (wide Nat.- Text.size t + 2) " "
+  List.map (cases (a, b) -> "  " ++ pad a ++ b) rows
+
+{{ The help of the command at ''path'' in plain text: what it does, each form's synopsis, its options and arguments
+   with what each does, its subcommands by group, and its examples. Nothing when the path names no command. }}
+cmdtree.help : cmdtree.Node r -> [Text] -> Optional Text
+cmdtree.help root path = match cmdtree.Node.at path root with
+  None -> None
+  Some node ->
+    forms = cmdtree.Node.forms node
+    flags = cmdtree.Node.flags node
+    args = List.distinct (List.flatMap (f -> cmdtree.Form.args f ++ Optional.toList (cmdtree.Form.rest f)) forms)
+    flagRow f =
+      shown = match cmdtree.Flag.short f with
+        Some c -> "-" ++ Char.toText c ++ ", " ++ cmdtree.Flag.synopsis (cmdtree.Flag.required.set true f)
+        None -> cmdtree.Flag.synopsis (cmdtree.Flag.required.set true f)
+      (shown, cmdtree.Flag.does f)
+    section title rows = if List.isEmpty rows then [] else ["", title ++ ":"] ++ rows
+    usage = List.map (f -> "  " ++ cmdtree.Form.synopsis path f) forms
+    examples = List.map (e -> "  " ++ e) (List.flatMap cmdtree.Form.examples forms)
+    head = Text.join " " path ++ ": " ++ cmdtree.Node.does node
+    lines =
+      [head] ++ section "Usage" usage
+        ++ section "Options" (cmdtree.columns (List.map flagRow flags))
+        ++ section "Arguments" (cmdtree.columns (List.map (a -> (cmdtree.Arg.name a, cmdtree.Arg.does a)) args))
+        ++ List.flatMap (cases (g, rows) -> section g rows) (cmdtree.groups node)
+        ++ section "Examples" examples
+    Some (Text.join "\n" lines)
+
+{{ A command's subcommands by group, in the order each group first appears, each as aligned lines of name and what
+   it does; a subcommand with no group is listed under ''Commands''. }}
+cmdtree.groups : cmdtree.Node r -> [(Text, [Text])]
+cmdtree.groups node =
+  children = cmdtree.Node.children node
+  named c = if cmdtree.Node.group c === "" then "Commands" else cmdtree.Node.group c
+  order = List.distinct (List.map named children)
+  rows g = List.map (c -> (cmdtree.Node.name c, cmdtree.Node.does c)) (List.filter (c -> named c === g) children)
+  List.map (g -> (g, cmdtree.columns (rows g))) order

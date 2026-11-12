@@ -3,9 +3,8 @@
 A command line declared once, as a typed tree, for Unison. The parser, its refusals, the help and a JSON export all
 come from that one value, so they cannot disagree.
 
-Status: in development, not released. The parser, the refusals, the tree check and the audit are written and tested;
-the help renderers, the JSON export and `toDoc` come next. The first release goes to Unison Share as
-`@modiqo/cmdtree`.
+Status: in development, not released. The parser, the refusals, the tree check, the audit, the help, the JSON export,
+Markdown and `toDoc` are written and tested. The first release goes to Unison Share as `@modiqo/cmdtree`.
 
 ## Why a tree
 
@@ -46,6 +45,12 @@ words: `cmdtree.parse notes ["show", "--lsat", "2"]` is
 | `Refusal` | why a call was refused, naming the command, the word, and the nearest right one for a typo |
 | `faults` | what is wrong with a tree: two forms a call cannot tell apart, an option with two shapes, … |
 | `audit` | a program's whole test of its tree: faults, examples, a sample call of each form, wrong calls |
+| `help`, `toDoc` | a command's help as plain text, or as a `Doc` for UCM and Unison Share |
+| `Refusal.say` | a refusal in plain English, for a program with no words of its own |
+| `export` | the tree as JSON (`@unison/json`), each form with its synopsis, for programs in other languages |
+| `markdown` | the whole tree as one Markdown page |
+
+Help text has one markup: a blank line between paragraphs, and code in backticks.
 
 Forms of one command are told apart by their options: one form requires an option the other does not take. `faults`
 refuses a tree that breaks this, so the parser never has two forms to choose between, and `clap` can express every

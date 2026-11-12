@@ -1,0 +1,32 @@
+{{ The whole tree as Markdown, every command in turn from the program down: a heading with its path, what it does,
+   each form's synopsis, a table of its options and of its arguments, and its examples. For a documentation page;
+   help text already uses Markdown's markup for code. }}
+cmdtree.markdown : cmdtree.Node r -> Text
+cmdtree.markdown root =
+  Text.join "\n" (List.flatMap (cases (path, node) -> cmdtree.markdown.node path node) (cmdtree.nodesOf [] root))
+
+{{ Every command of the tree with its path, the program first. }}
+cmdtree.nodesOf : [Text] -> cmdtree.Node r -> [([Text], cmdtree.Node r)]
+cmdtree.nodesOf above node =
+  path = above :+ cmdtree.Node.name node
+  (path, node) +: List.flatMap (cmdtree.nodesOf path) (cmdtree.Node.children node)
+
+{{ One command's section of the Markdown. }}
+cmdtree.markdown.node : [Text] -> cmdtree.Node r -> [Text]
+cmdtree.markdown.node path node =
+  forms = cmdtree.Node.forms node
+  cell t = Text.join "\\|" (Text.split ?| t)
+  line = cases (a, b) -> "| `" ++ cell a ++ "` | " ++ cell b ++ " |"
+  table title rows = if List.isEmpty rows then [] else ["", "| " ++ title ++ " | |", "|---|---|"] ++ List.map line rows
+  fence lines = if List.isEmpty lines then [] else ["", "```"] ++ lines ++ ["```"]
+  flagRow f = (cmdtree.Flag.synopsis (cmdtree.Flag.required.set true f), cmdtree.Flag.does f)
+  args = List.distinct (List.flatMap (f -> cmdtree.Form.args f ++ Optional.toList (cmdtree.Form.rest f)) forms)
+  child c = (Text.join " " (path :+ cmdtree.Node.name c), cmdtree.Node.does c)
+  children = List.map child (cmdtree.Node.children node)
+  ["## `" ++ Text.join " " path ++ "`", "", cmdtree.Node.does node]
+    ++ fence (List.map (cmdtree.Form.synopsis path) forms)
+    ++ table "Option" (List.map flagRow (cmdtree.Node.flags node))
+    ++ table "Argument" (List.map (a -> (cmdtree.Arg.name a, cmdtree.Arg.does a)) args)
+    ++ table "Command" children
+    ++ fence (List.flatMap cmdtree.Form.examples forms)
+    ++ [""]

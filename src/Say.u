@@ -1,0 +1,21 @@
+{{ A refusal in plain English, for a program that has no words of its own for it:
+   ''notes list: unknown option --limt; did you mean --limit?''. }}
+cmdtree.Refusal.say : cmdtree.Refusal -> Text
+cmdtree.Refusal.say r =
+  use cmdtree.Refusal BadValue GivenTwice MissingCommand MissingRequired MissingValue NotFound
+  use cmdtree.Refusal OptionOfAnotherForm TooManyArguments UnknownCommand UnknownOption
+  at path = Text.join " " path ++ ": "
+  hint = cases
+    Some n -> "; did you mean " ++ n ++ "?"
+    None -> ""
+  match r with
+    UnknownCommand path w near -> at path ++ "unknown command " ++ w ++ hint near
+    MissingCommand path names -> at path ++ "needs a command: " ++ Text.join ", " names
+    UnknownOption path f near -> at path ++ "unknown option " ++ f ++ hint near
+    OptionOfAnotherForm path f other -> at path ++ f ++ " goes with another form: " ++ other
+    MissingValue path f -> at path ++ f ++ " needs a value"
+    MissingRequired path name -> at path ++ name ++ " is required"
+    BadValue path name kind given why -> at path ++ name ++ " takes a " ++ kind ++ ", and " ++ given ++ ": " ++ why
+    TooManyArguments path w -> at path ++ w ++ " is past the last argument"
+    GivenTwice path f -> at path ++ f ++ " is given twice"
+    NotFound kind given -> "no " ++ kind ++ " " ++ given

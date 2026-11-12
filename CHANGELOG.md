@@ -12,5 +12,8 @@
 - `faults`: a tree whose forms cannot be told apart, or with any of nine other faults, is named.
 - `audit`: every example calls its form, a call made of a form's samples parses back to it, and wrong calls made
   from each form are refused for the right reason.
+- `help` (plain text: usage, options, arguments, subcommands by group, examples), `toDoc` (the same as a `Doc`),
+  `markdown` (every command on one page, `|` escaped in its tables), `Refusal.say` (plain English) and `export`
+  (the tree as JSON, version 1, each kind with a sample value and each form with its synopsis).
 - The build loads every file into a codebase holding only the pinned dependencies and runs every test; CI runs it
   with UCM 1.5.0 checked against its sha256.
