@@ -15,7 +15,7 @@ cmdtree.Refusal.say r =
     OptionOfAnotherForm path f other -> at path ++ f ++ " goes with another form: " ++ other
     MissingValue path f -> at path ++ f ++ " needs a value"
     MissingRequired path name -> at path ++ name ++ " is required"
-    BadValue path name kind given why -> at path ++ name ++ " takes a " ++ kind ++ ", and " ++ given ++ ": " ++ why
-    TooManyArguments path w -> at path ++ w ++ " is past the last argument"
+    BadValue path name _ given why -> at path ++ name ++ " " ++ given ++ ": " ++ why
+    TooManyArguments path w -> at path ++ w ++ " is one word too many"
     GivenTwice path f -> at path ++ f ++ " is given twice"
     NotFound kind given -> "no " ++ kind ++ " " ++ given

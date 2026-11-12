@@ -1,0 +1,56 @@
+{{ A small program built with cmdtree, for the README: ''notes'' lists, shows and adds notes, keeping three in
+   memory. Its whole command line is the one value {cmdtree.example.notes}; {cmdtree.example.main} parses the words it
+   is called with and runs the form's handler, prints the help asked for, or says why the words were refused. Run it
+   with ''ucm run'' and the words after ''--''. }}
+cmdtree.example.main : '{IO, Exception} ()
+cmdtree.example.main = do
+  match cmdtree.parse cmdtree.example.notes (getArgs()) with
+    Right (cmdtree.Call.Run _ _ form parsed) -> cmdtree.Form.run form parsed
+    Right (cmdtree.Call.Help path) -> printLine (Optional.getOrElse "" (cmdtree.help cmdtree.example.notes path))
+    Left refusal -> printLine (cmdtree.Refusal.say refusal)
+
+{{ The notes the example keeps. }}
+cmdtree.example.kept : [Text]
+cmdtree.example.kept = ["Buy milk", "Call the dentist", "Fix the bike"]
+
+{{ The example's command line: three commands, one of them with two forms told apart by ''--last''. }}
+cmdtree.example.notes : cmdtree.Node (cmdtree.Parsed ->{IO, Exception} ())
+cmdtree.example.notes =
+  use cmdtree arg command examples form option required short switch
+  use cmdtree.Kind Choice Natural Plain
+  numbered = cases (n, i) -> Nat.toText (i + 1) ++ ". " ++ n
+  list p =
+    limit = Optional.getOrElse 3 (cmdtree.Parsed.nat "limit" p)
+    shown = List.take limit (List.indexed cmdtree.example.kept)
+    if cmdtree.Parsed.text "format" p === Some "json" then
+      printLine (lib.unison_json_1_4_2.core.Json.toText (lib.unison_json_1_4_2.core.Json.array
+        (List.map (cases (n, _) -> lib.unison_json_1_4_2.core.Json.text n) shown)))
+    else printLine (Text.join "\n" (List.map numbered shown))
+  byId p =
+    id = Optional.getOrElse 0 (cmdtree.Parsed.nat "ID" p)
+    match List.at (id Nat.- 1) cmdtree.example.kept with
+      Some n | id > 0 -> printLine n
+      _ -> printLine (cmdtree.Refusal.say (cmdtree.Refusal.NotFound "note" (Nat.toText id)))
+  last p =
+    n = Optional.getOrElse 1 (cmdtree.Parsed.nat "last" p)
+    printLine (Text.join "\n" (List.drop (List.size cmdtree.example.kept Nat.- n) cmdtree.example.kept))
+  add p =
+    words = Text.join " " (cmdtree.Parsed.texts "TEXT" p ++ cmdtree.Parsed.texts "MORE" p)
+    tags = List.map (t -> " #" ++ t) (cmdtree.Parsed.texts "tag" p)
+    pin = if cmdtree.Parsed.given "pin" p then " (pinned)" else ""
+    printLine ("added: " ++ words ++ Text.join "" tags ++ pin)
+  listing =
+    flags =
+      [ short ?n (option "limit" Natural "How many to list.")
+      , option "format" (Choice ["text", "json"]) "How to print them."
+      ]
+    command "list" "Read" "List the notes." [] [examples ["notes list -n 2"] (form flags [] list)]
+  showing =
+    one = examples ["notes show 2"] (form [] [arg "ID" Natural "The note's number."] byId)
+    newest = examples ["notes show --last 2"] (form [required (option "last" Natural "How many.")] [] last)
+    command "show" "Read" "Show one note, or the newest." [] [one, newest]
+  adding =
+    flags = [cmdtree.repeated (option "tag" Plain "A tag; give it again for more."), switch "pin" "Keep it first."]
+    shape = cmdtree.rest (arg "MORE" Plain "The rest of the words.") (form flags [arg "TEXT" Plain "The note."] add)
+    command "add" "Write" "Add a note." [] [examples ["notes add buy bread --tag shop --pin"] shape]
+  command "notes" "" "Keep short notes." [listing, showing, adding] []

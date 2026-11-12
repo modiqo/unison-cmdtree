@@ -1,0 +1,17 @@
+use test check
+
+-- The README shows the example's refusals as the program says them; these hold each line, and the example program
+-- passes its own audit.
+test> cmdtree.tests.exampleSays =
+  said line = match cmdtree.parse cmdtree.example.notes (Text.split ?\s line) with
+    Left r -> cmdtree.Refusal.say r
+    Right _ -> "ran"
+  check
+    ((said "lst" === "notes: unknown command lst; did you mean list?")
+      && (said "show --lsat 2" === "notes show: unknown option --lsat; did you mean --last?")
+      && (said "list --format xml" === "notes list: --format xml: it is not one of text, json")
+      && (said "add" === "notes add: TEXT is required")
+      && (said "show 2 --last 1" === "notes show: 2 is one word too many")
+      && (said "show 9" === "ran")
+      && (cmdtree.Refusal.say (cmdtree.Refusal.NotFound "note" "9") === "no note 9")
+      && (cmdtree.audit cmdtree.example.notes === []))

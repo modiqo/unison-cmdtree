@@ -2,9 +2,17 @@
 
 ## Unreleased
 
+## 0.1.1 — 2026-11-12
+
+- `example/Notes.u`: a whole program built with cmdtree (`cmdtree.example.main`), which the README shows running,
+  and a test that holds each refusal the README quotes.
+- `Refusal.say` reads plainer: `--format xml: it is not one of text, json` (was `--format takes a choice, and xml:
+  …`) and `2 is one word too many` (was `2 is past the last argument`).
+- The README says what the library saves a program and how to use it.
+
 ## 0.1.0 — 2026-11-12
 
-The first release, on Unison Share as `@modiqo/cmdtree`, licensed MIT OR Apache-2.0.
+The first release, on Unison Share as `@conikeec/cmdtree`, licensed MIT OR Apache-2.0.
 
 - The tree: `Node`, `Form`, `Flag`, `Arg` and `Kind`, with builders (`command`, `form`, `option`, `switch`, `arg`,
   `optionalArg`, `required`, `repeated`, `short`, `rest`, `why`, `examples`).

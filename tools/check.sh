@@ -9,16 +9,16 @@
 set -eu
 cd "$(dirname "$0")/.."
 fail=0
-for f in $(find src test -name '*.u' | sort); do
+for f in $(find src example test -name '*.u' | sort); do
   n=$(grep -cvE '^[[:space:]]*(--.*)?$' "$f" || true)
   if [ "$n" -gt 80 ]; then echo "check: $f has $n source lines; at most 80" >&2; fail=1; fi
 done
-wide=$(find src test tools README.md CHANGELOG.md -type f \( -name "*.u" -o -name "*.md" -o -name "*.sh" \) \
+wide=$(find src example test tools README.md CHANGELOG.md -type f \( -name "*.u" -o -name "*.md" -o -name "*.sh" \) \
   ! -name deps.md ! -name release.md \
   -exec awk 'length > 120 { print FILENAME ":" FNR ": " length " characters" }' {} +)
 if [ -n "$wide" ]; then echo "$wide" >&2; echo "check: lines over 120 characters" >&2; fail=1; fi
 if grep -rniE '\bolki\b' src >/dev/null 2>&1; then
   grep -rniE '\bolki\b' src >&2; echo "check: the library names a program that uses it" >&2; fail=1
 fi
-[ "$fail" = 0 ] && echo "check: $(find src test -name '*.u' | wc -l | tr -d ' ') Unison files within the limits"
+[ "$fail" = 0 ] && echo "check: $(find src example test -name '*.u' | wc -l | tr -d ' ') Unison files within the limits"
 exit "$fail"

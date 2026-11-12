@@ -18,6 +18,9 @@ README =
   * {cmdtree.help}, {cmdtree.toDoc}, {cmdtree.markdown}, {cmdtree.Refusal.say}: help and refusals for people.
   * {cmdtree.export}: the tree as JSON, for programs in other languages.
 
+  {cmdtree.example.main} is a whole program built with it: ''notes'', with three commands and a ''main'' that
+  parses, runs, helps or refuses. Its README on GitHub shows it running.
+
   Source, issues and changes: [modiqo/unison-cmdtree](https://github.com/modiqo/unison-cmdtree). Licensed under
   either of the Apache License, Version 2.0 or the MIT license, at your option.
   }}

@@ -1,72 +1,153 @@
 # cmdtree
 
-A command line declared once, as a typed tree, for Unison. The parser, its refusals, the help and a JSON export all
-come from that one value, so they cannot disagree.
+Declare a command line once, as a typed tree, and get everything else from it: the parser, refusals that name the
+wrong word and the nearest right one, help, a Markdown page, a `Doc` for UCM and Unison Share, a JSON export for
+programs in other languages, and a test of the whole command line.
 
-Status: in development, not released. The parser, the refusals, the tree check, the audit, the help, the JSON export,
-Markdown and `toDoc` are written and tested. The first release goes to Unison Share as `@modiqo/cmdtree`.
-
-## Why a tree
-
-A command line has three readers: the parser turns words into values, the help tells a person what to type, and the
-handlers use the values. When each reads the grammar from its own place, they drift: the help lists an option the
-parser refuses, or a subcommand works that no help mentions. Here the grammar is one value, and every reader is
-derived from it. A program can also export it as JSON, so a program in another language (a shell completion, a
-launcher written in Rust with `clap`) builds its view from the same value.
-
-## A program in one value
-
-```unison
-notes : cmdtree.Node Text
-notes =
-  use cmdtree arg command examples form option required switch
-  use cmdtree.Kind Natural Plain
-  byId = examples ["notes show 12"] (form [] [arg "ID" Natural "The note."] "byId")
-  last = examples ["notes show --last 2"] (form [required (option "last" Natural "The newest ones.")] [] "last")
-  show = command "show" "Read" "Show notes." [] [byId, last]
-  add = command "add" "Write" "Add a note." [] [form [switch "pin" "Keep it at the top."] [arg "TEXT" Plain ""] "add"]
-  command "notes" "" "Keep notes." [add, show] []
+```ucm
+myproject/main> lib.install @conikeec/cmdtree/releases/0.1.1
 ```
 
-`cmdtree.parse notes ["show", "--last", "2"]` gives `Right (Run ["notes", "show"] 1 form parsed)`: the path, the
-form's index, the form (its `run` is whatever the program put there) and the values by name
-(`cmdtree.Parsed.nat "last" parsed` is `Some 2`). A wrong call gives a `Refusal`, a value the program says in its own
-words: `cmdtree.parse notes ["show", "--lsat", "2"]` is
-`Left (UnknownOption ["notes", "show"] "--lsat" (Some "--last"))`. The tests hold every line of this example
-(`test/Readme.u`).
+## What it saves you
+
+A command line has three readers: the parser turns words into values, the help tells a person what to type, and the
+handlers use the values. Written in three places, they drift: the help lists an option the parser refuses, a typo
+reaches a handler as a value, a subcommand works that no help mentions. With cmdtree the command line is one value,
+and the parser, the help and the docs are all read from it, so they cannot disagree.
+
+- **Wrong words never reach your code.** Every value is checked against its kind (a number, a day, one of a list, a
+  span of time, JSON, or a kind of your own) before a handler runs. A wrong call is a `Refusal` value naming the
+  command, the word, and, for a typo, the nearest right name.
+- **Help that is always true.** Usage lines, options, arguments, subcommands and examples are rendered from the same
+  value the parser walks.
+- **One test for the whole command line.** `cmdtree.audit` checks that every example you wrote calls the form it
+  illustrates, that a call made of each form's sample values parses back to it, that wrong calls made from each form
+  are refused for the right reason, and that no two forms of a command can be confused.
+- **Other languages read the same grammar.** `cmdtree.export` gives the tree as JSON, so a launcher in Rust or a
+  shell completion script is built from it instead of written a second time.
+
+## A whole program
+
+`example/Notes.u` is a complete program: a `notes` command that lists, shows and adds notes. Its command line is
+one value; here is one of its three commands, `show`, which has two forms told apart by `--last`:
+
+```unison
+showing =
+  one = examples ["notes show 2"] (form [] [arg "ID" Natural "The note's number."] byId)
+  newest = examples ["notes show --last 2"] (form [required (option "last" Natural "How many.")] [] last)
+  command "show" "Read" "Show one note, or the newest." [] [one, newest]
+```
+
+A form's last part is what runs it, here a handler of type `cmdtree.Parsed ->{IO, Exception} ()` that reads its
+values by name (`cmdtree.Parsed.nat "ID" p`). The program's `main` is the same for any tree:
+
+```unison
+cmdtree.example.main : '{IO, Exception} ()
+cmdtree.example.main = do
+  match cmdtree.parse cmdtree.example.notes (getArgs()) with
+    Right (cmdtree.Call.Run _ _ form parsed) -> cmdtree.Form.run form parsed
+    Right (cmdtree.Call.Help path) -> printLine (Optional.getOrElse "" (cmdtree.help cmdtree.example.notes path))
+    Left refusal -> printLine (cmdtree.Refusal.say refusal)
+```
+
+Run with `ucm run cmdtree/main:.cmdtree.example.main -- WORDS`, it answers as below. Every line is the program's
+own output (`notes` stands for the `ucm run` line):
+
+```text
+$ notes --help
+notes: Keep short notes.
+
+Read:
+  list  List the notes.
+  show  Show one note, or the newest.
+
+Write:
+  add  Add a note.
+
+$ notes show --help
+notes show: Show one note, or the newest.
+
+Usage:
+  notes show ID
+  notes show --last NAT
+
+Options:
+  --last NAT  How many.
+
+Arguments:
+  ID  The note's number.
+
+Examples:
+  notes show 2
+  notes show --last 2
+
+$ notes show 2
+Call the dentist
+$ notes show --last 2
+Call the dentist
+Fix the bike
+$ notes list -n 2 --format json
+["Buy milk","Call the dentist"]
+$ notes add buy bread --tag shop --tag home --pin
+added: buy bread #shop #home (pinned)
+
+$ notes lst
+notes: unknown command lst; did you mean list?
+$ notes show --lsat 2
+notes show: unknown option --lsat; did you mean --last?
+$ notes list --format xml
+notes list: --format xml: it is not one of text, json
+$ notes add
+notes add: TEXT is required
+$ notes show 2 --last 1
+notes show: 2 is one word too many
+$ notes show 9
+no note 9
+```
+
+The last line is the handler's own refusal: `9` is a number, so the parser passed it, but there is no ninth note, so
+the handler answers with `cmdtree.Refusal.NotFound "note" "9"`, said the same way.
+
+## Test the command line
+
+One test holds the whole tree to everything above:
+
+```unison
+test> myapp.tests.commandLine = test.verify do ensureEqual (cmdtree.audit myapp.commandLine) []
+```
+
+A failure names the form and the call, such as
+``notes show (form 1): `notes show 7 --zz-none` was not refused as an unknown option``.
 
 ## The parts
 
 | Part | What it is |
 |---|---|
 | `Node`, `Form`, `Flag`, `Arg` | a command, one way to call it, an option, an argument by its place |
-| `Kind` | what a value is read as: text, `Nat`, `Int`, one of a list, a span, a day, JSON, or the program's own |
+| `command`, `form`, `option`, `switch`, `arg` | builders, with `required`, `repeated`, `short`, `rest`, `examples` |
+| `Kind` | what a value is read as: text, `Nat`, `Int`, one of a list, a span, a day, JSON, or your own |
 | `parse` | words to `Run path index form values`, `Help path`, or a `Refusal` |
-| `Refusal` | why a call was refused, naming the command, the word, and the nearest right one for a typo |
-| `faults` | what is wrong with a tree: two forms a call cannot tell apart, an option with two shapes, … |
-| `audit` | a program's whole test of its tree: faults, examples, a sample call of each form, wrong calls |
-| `help`, `toDoc` | a command's help as plain text, or as a `Doc` for UCM and Unison Share |
-| `Refusal.say` | a refusal in plain English, for a program with no words of its own |
-| `export` | the tree as JSON (`@unison/json`), each form with its synopsis, for programs in other languages |
-| `markdown` | the whole tree as one Markdown page |
+| `Refusal`, `Refusal.say` | why a call was refused, as a value and in plain English |
+| `faults`, `audit` | what is wrong with a tree; the whole test of a command line |
+| `help`, `toDoc`, `markdown` | a command's help as text or as a `Doc`; every command on one Markdown page |
+| `export` | the tree as JSON (`@unison/json`), each form with its synopsis |
 
-Help text has one markup: a blank line between paragraphs, and code in backticks.
+Forms of one command are told apart by their options: one form requires an option the other does not take, as
+`--last` does above. `faults` refuses a tree that breaks this, so a call never matches two forms. Help text has one
+markup: a blank line between paragraphs, and code in backticks.
 
-Forms of one command are told apart by their options: one form requires an option the other does not take. `faults`
-refuses a tree that breaks this, so the parser never has two forms to choose between, and `clap` can express every
-tree.
+## Building from source
 
-## Building
-
-The repository holds Unison source files; a build loads them into a fresh codebase that holds only the pinned
-dependencies (`@unison/base` 7.20.0 and `@unison/json` 1.4.2, each pinned by its namespace hash in `tools/deps.md`).
+The repository holds Unison source files: the library in `src/`, the example in `example/`, the tests in `test/`.
+A build loads them into a fresh codebase that holds only the pinned dependencies (`@unison/base` 7.20.0 and
+`@unison/json` 1.4.2, each pinned by its namespace hash in `tools/deps.md`):
 
 ```sh
 tools/check.sh    # limits: a Unison file at most 80 source lines, no line over 120 characters
-tools/build.sh    # load every file in src/ and test/ with UCM 1.5.0, then run every test
+tools/build.sh    # load every file with UCM 1.5.0, then run every test
 ```
 
-Each source file says one thing in at most 80 lines; a definition's documentation is its `{{ }}` block.
+`tools/release.md` is the release: the same files loaded, tested, and pushed to Unison Share.
 
 ## License
 

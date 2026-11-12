@@ -1,7 +1,7 @@
 # A release to Unison Share
 
 Run from the repository root at a commit that passed CI, with UCM signed in to an account that may push to
-`@modiqo` (`auth.login`): `rm -rf .release && tools/build.sh && ucm transcript -S .release tools/release.md`. It
+`@conikeec` (`auth.login`): `rm -rf .release && tools/build.sh && ucm transcript -S .release tools/release.md`. It
 loads the same files the build loads into a codebase of its own, runs the tests, pushes `main`, and drafts the
 release named below; the draft is published on the project's page on Share. Change the version in both lines.
 
@@ -16,7 +16,7 @@ cmdtree/main> fork #js5o8plfinkmgsovi24hh2ddn46v94mnm4sirvrdtmcd5of1t7tembll9fbg
 cmdtree/main> load build/all.u
 cmdtree/main> add
 cmdtree/main> test
-cmdtree/main> push @modiqo/cmdtree/main
-cmdtree/main> release.draft 0.1.0
-cmdtree/releases/drafts/0.1.0> push @modiqo/cmdtree/releases/drafts/0.1.0
+cmdtree/main> push @conikeec/cmdtree/main
+cmdtree/main> release.draft 0.1.1
+cmdtree/releases/drafts/0.1.1> push @conikeec/cmdtree/releases/drafts/0.1.1
 ```

@@ -21,7 +21,7 @@ if [ ! -d .codebase ] || [ tools/deps.md -nt .codebase/deps.stamp ]; then
 fi
 # One file, sources first and tests after, each in path order: UCM resolves names within one load in any order.
 : > build/all.u
-for f in $(find src test -name '*.u' | sort); do
+for f in $(find src example test -name '*.u' | sort); do
   printf -- '-- %s\n' "$f" >> build/all.u
   cat "$f" >> build/all.u
   printf '\n' >> build/all.u
@@ -50,4 +50,5 @@ if [ "$ok" = 0 ]; then
   exit 1
 fi
 passed=$(sed -n 's/.*✅ \([0-9]*\) test(s) passing.*/\1/p' build/build.output.md | tail -1)
-echo "build: $(find src -name '*.u' | wc -l | tr -d ' ') source files, ${passed:-0} tests passing"
+files() { find "$1" -name '*.u' | wc -l | tr -d ' '; }
+echo "build: $(files src) library files, $(files example) example, ${passed:-0} tests passing"
