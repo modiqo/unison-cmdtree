@@ -5,7 +5,7 @@ wrong word and the nearest right one, help, a Markdown page, a `Doc` for UCM and
 programs in other languages, and a test of the whole command line.
 
 ```ucm
-myproject/main> lib.install @conikeec/cmdtree/releases/0.1.1
+myproject/main> lib.install @conikeec/cmdtree/releases/0.1.2
 ```
 
 ## What it saves you
@@ -133,8 +133,12 @@ A failure names the form and the call, such as
 | `export` | the tree as JSON (`@unison/json`), each form with its synopsis |
 
 Forms of one command are told apart by their options: one form requires an option the other does not take, as
-`--last` does above. `faults` refuses a tree that breaks this, so a call never matches two forms. Help text has one
-markup: a blank line between paragraphs, and code in backticks.
+`--last` does above. `faults` refuses a tree that breaks this, so a call never matches two forms. A call that mixes
+the options of two forms is refused naming both, the option that picked one form and the option that belongs to the
+other: `run: --dry goes with another form than --from-session: run --circuit TEXT [--dry]`. The word after an option
+that takes a value is its value unless it names an option of the command: `--model --where` is refused as
+`--model needs a value`, and `--model=--where` gives the value. Help text has one markup: a blank line between
+paragraphs, and code in backticks.
 
 ## Building from source
 

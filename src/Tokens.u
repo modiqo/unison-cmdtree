@@ -18,8 +18,17 @@ cmdtree.Flag.named flags typed =
     [?-, c] -> List.find (f -> cmdtree.Flag.short f === Some c) flags
     _ -> None
 
+{{ An option word split at its first ''='': ''--days=7'' is ''--days'' with ''7'' attached; any other word is
+   itself with nothing attached. }}
+cmdtree.attached : Text -> (Text, Optional Text)
+cmdtree.attached w = match Text.split ?= w with
+  t +: (v +: more) | Text.startsWith "--" w -> (t, Some (Text.join "=" (v +: more)))
+  _ -> (w, None)
+
 {{ Split the words after a command's path into the options given, each with its value, and the other words, in
-   order. ''--'' ends the options: every word after it is an argument. }}
+   order. ''--'' ends the options: every word after it is an argument. The word after an option that takes a value
+   is its value, unless it names an option of the command (''--model --where''): then the option was given no value.
+   Such a value is given attached, ''--model=--where''. }}
 cmdtree.read :
   [Text] -> [cmdtree.Flag] -> [(Text, Optional Text)] -> [Text] -> [Text]
   -> Either cmdtree.Refusal ([(Text, Optional Text)], [Text])
@@ -27,10 +36,9 @@ cmdtree.read path flags given words = cases
   [] -> Right (given, words)
   "--" +: rest -> Right (given, words ++ rest)
   w +: rest | cmdtree.isOption w ->
-    (typed, attached) = match Text.split ?= w with
-      t +: (v +: more) | Text.startsWith "--" w -> (t, Some (Text.join "=" (v +: more)))
-      _ -> (w, None)
+    (typed, attached) = cmdtree.attached w
     names = List.map (f -> "--" ++ cmdtree.Flag.name f) flags
+    named v = Optional.isSome (cmdtree.Flag.named flags (at1 (cmdtree.attached v)))
     match cmdtree.Flag.named flags typed with
       None -> Left (cmdtree.Refusal.UnknownOption path typed (cmdtree.nearest typed names))
       Some f ->
@@ -39,6 +47,6 @@ cmdtree.read path flags given words = cases
           (None, None, _) -> cmdtree.read path flags (given :+ (name, None)) words rest
           (None, Some v, _) -> Left (cmdtree.Refusal.BadValue path typed "switch" v "a switch takes no value")
           (Some _, Some v, _) -> cmdtree.read path flags (given :+ (name, Some v)) words rest
-          (Some _, None, v +: more) -> cmdtree.read path flags (given :+ (name, Some v)) words more
-          (Some _, None, []) -> Left (cmdtree.Refusal.MissingValue path typed)
+          (Some _, None, v +: more) | not (named v) -> cmdtree.read path flags (given :+ (name, Some v)) words more
+          (Some _, None, _) -> Left (cmdtree.Refusal.MissingValue path typed)
   w +: rest -> cmdtree.read path flags given (words :+ w) rest

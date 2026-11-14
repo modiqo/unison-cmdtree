@@ -32,5 +32,5 @@ test> cmdtree.tests.say =
       && (say (MissingCommand ["notes", "sync"] ["push", "pull"]) === "notes sync: needs a command: push, pull")
       && (say (BadValue ["notes", "list"] "--limit" "nat" "x" "it is not a whole number of 0 or more")
         === "notes list: --limit x: it is not a whole number of 0 or more")
-      && (say (OptionOfAnotherForm ["stats"] "--all" "stats SESSION [--all]")
-        === "stats: --all goes with another form: stats SESSION [--all]"))
+      && (say (OptionOfAnotherForm ["stats"] "--all" "--project" "stats SESSION [--all]")
+        === "stats: --all goes with another form than --project: stats SESSION [--all]"))

@@ -12,7 +12,7 @@ cmdtree.Refusal.say r =
     UnknownCommand path w near -> at path ++ "unknown command " ++ w ++ hint near
     MissingCommand path names -> at path ++ "needs a command: " ++ Text.join ", " names
     UnknownOption path f near -> at path ++ "unknown option " ++ f ++ hint near
-    OptionOfAnotherForm path f other -> at path ++ f ++ " goes with another form: " ++ other
+    OptionOfAnotherForm path f by other -> at path ++ f ++ " goes with another form than " ++ by ++ ": " ++ other
     MissingValue path f -> at path ++ f ++ " needs a value"
     MissingRequired path name -> at path ++ name ++ " is required"
     BadValue path name _ given why -> at path ++ name ++ " " ++ given ++ ": " ++ why

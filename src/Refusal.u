@@ -4,9 +4,9 @@
    * ''UnknownCommand path word nearest'': ''word'' is no subcommand of ''path''; ''nearest'' is the closest one.
    * ''MissingCommand path subcommands'': ''path'' needs a subcommand and none was given.
    * ''UnknownOption path flag nearest'': no form of ''path'' takes ''flag''.
-   * ''OptionOfAnotherForm path flag other'': ''flag'' belongs to another form of ''path'' (its synopsis), and the
-     options given with it choose this one.
-   * ''MissingValue path flag'': ''flag'' takes a value and none followed it.
+   * ''OptionOfAnotherForm path flag by other'': ''flag'' belongs to another form of ''path'' (''other'', its
+     synopsis) than the one the option ''by'', given with it, picked.
+   * ''MissingValue path flag'': ''flag'' takes a value and none followed it, or the word after it names an option.
    * ''MissingRequired path name'': the required option or argument ''name'' was not given.
    * ''BadValue path name kind given why'': ''given'' is not a value of ''kind'' for ''name''.
    * ''TooManyArguments path word'': ''word'' is past the arguments the form takes.
@@ -16,7 +16,7 @@ type cmdtree.Refusal
   = UnknownCommand [Text] Text (Optional Text)
   | MissingCommand [Text] [Text]
   | UnknownOption [Text] Text (Optional Text)
-  | OptionOfAnotherForm [Text] Text Text
+  | OptionOfAnotherForm [Text] Text Text Text
   | MissingValue [Text] Text
   | MissingRequired [Text] Text
   | BadValue [Text] Text Text Text Text

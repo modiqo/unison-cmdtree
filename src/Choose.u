@@ -1,27 +1,47 @@
 {{ Choose the form of the command a call meant, from the options given: the form that takes every one of them and
    has each of its required options given (the tree check leaves at most one), else the first that takes them all,
-   which then refuses the missing option. When no form takes them all, the option that belongs elsewhere is named. }}
+   which then refuses the missing option. When no form takes them all, the call is refused
+   (''cmdtree.choose.refusal''). }}
 cmdtree.choose :
   [Text] -> cmdtree.Node r -> [(Text, Optional Text)] -> [Text] -> Either cmdtree.Refusal (cmdtree.Call r)
 cmdtree.choose path node given words =
   names = List.distinct (List.map at1 given)
-  takes form n = List.any (f -> cmdtree.Flag.name f === n) (cmdtree.Form.flags form)
   needed form = List.all (f -> not (cmdtree.Flag.required f) || List.contains (cmdtree.Flag.name f) names)
   forms = List.indexed (cmdtree.Node.forms node)
-  takesAll = cases (form, _) -> List.all (takes form) names
+  takesAll = cases (form, _) -> List.all (cmdtree.Form.takes form) names
   candidates = List.filter takesAll forms
   ready = cases (form, _) -> needed form (cmdtree.Form.flags form)
   match (List.find ready candidates, candidates) with
     (Some (form, i), _) -> cmdtree.bind path i form given words
     (None, (form, i) +: _) -> cmdtree.bind path i form given words
-    (None, []) ->
-      count = cases (form, _) -> (List.size (List.filter (takes form) names), form)
-      better best next = if Nat.gt (at1 next) (at1 best) then next else best
-      match List.map count forms with
-        [] -> Left (cmdtree.Refusal.MissingCommand path [])
-        first +: more ->
-          best = at2 (List.foldLeft better first more)
-          bad = Optional.getOrElse "" (List.find (n -> not (takes best n)) names)
-          other = List.find (cases (form, _) -> takes form bad) forms
-          shown = Optional.getOrElse "" (Optional.map (cases (form, _) -> cmdtree.Form.synopsis path form) other)
-          Left (cmdtree.Refusal.OptionOfAnotherForm path ("--" ++ bad) shown)
+    (None, []) -> Left (cmdtree.choose.refusal path names forms)
+
+{{ Whether a form takes the option ''name'' (without its dashes). }}
+cmdtree.Form.takes : cmdtree.Form r -> Text -> Boolean
+cmdtree.Form.takes form name = List.any (f -> cmdtree.Flag.name f === name) (cmdtree.Form.flags form)
+
+{{ The forms the options given pick, in the order given: each option keeps the forms that take it, when any does. }}
+cmdtree.choose.picked : [Text] -> [(cmdtree.Form r, Nat)] -> [(cmdtree.Form r, Nat)]
+cmdtree.choose.picked names forms =
+  narrow kept n = match List.filter (cases (form, _) -> cmdtree.Form.takes form n) kept with
+    [] -> kept
+    some -> some
+  List.foldLeft narrow forms names
+
+{{ Why no form takes every option given. The options pick a form (''cmdtree.choose.picked''), which refuses the
+   first option it does not take; among the forms that take that option they pick the other form, whose synopsis is
+   shown. The option named with it is the first that the picked form takes and the other does not: the one that
+   picked it over the other. ''run --circuit X --from-session S --dry'': ''--dry goes with another form than
+   --from-session''. }}
+cmdtree.choose.refusal : [Text] -> [Text] -> [(cmdtree.Form r, Nat)] -> cmdtree.Refusal
+cmdtree.choose.refusal path names forms =
+  use cmdtree.Form takes
+  match cmdtree.choose.picked names forms with
+    [] -> cmdtree.Refusal.MissingCommand path []
+    (best, _) +: _ ->
+      flag = Optional.getOrElse "" (List.find (n -> not (takes best n)) names)
+      match cmdtree.choose.picked names (List.filter (cases (form, _) -> takes form flag) forms) with
+        [] -> cmdtree.Refusal.UnknownOption path ("--" ++ flag) None
+        (other, _) +: _ ->
+          by = Optional.getOrElse "" (List.find (n -> takes best n && not (takes other n)) names)
+          cmdtree.Refusal.OptionOfAnotherForm path ("--" ++ flag) ("--" ++ by) (cmdtree.Form.synopsis path other)

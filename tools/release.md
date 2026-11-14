@@ -23,6 +23,6 @@ cmdtree/main> load build/all.u
 cmdtree/main> add
 cmdtree/main> test
 cmdtree/main> push @conikeec/cmdtree/main
-cmdtree/main> release.draft 0.1.1
-cmdtree/releases/drafts/0.1.1> push @conikeec/cmdtree/releases/drafts/0.1.1
+cmdtree/main> release.draft 0.1.2
+cmdtree/releases/drafts/0.1.2> push @conikeec/cmdtree/releases/drafts/0.1.2
 ```

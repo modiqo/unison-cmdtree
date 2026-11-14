@@ -28,7 +28,7 @@ cmdtree.Form.faults at form =
    the other does not take. The parser then never has two forms to choose between, and ''clap'' can say the same. }}
 cmdtree.Form.apart : cmdtree.Form r -> cmdtree.Form r -> Boolean
 cmdtree.Form.apart a b =
-  takes form n = List.any (f -> cmdtree.Flag.name f === n) (cmdtree.Form.flags form)
+  use cmdtree.Form takes
   needs form = List.map cmdtree.Flag.name (List.filter cmdtree.Flag.required (cmdtree.Form.flags form))
   List.any (n -> not (takes b n)) (needs a) || List.any (n -> not (takes a n)) (needs b)
 

@@ -1,6 +1,7 @@
 use test check
 
--- Calls that parse: the path, the form's index, its run value, and the values by name.
+-- Calls that parse: the path, the form's index, its run value, and the values by name. A value that begins with -- is
+-- a value unless it names an option of the command; given attached (--tag=--pin), any word is.
 test> cmdtree.tests.parses =
   use cmdtree.Call Run
   p line = cmdtree.parse cmdtree.tests.notes (Text.split ?\s line)
@@ -17,7 +18,9 @@ test> cmdtree.tests.parses =
       && (ran "show --last 3" === Some (["notes", "show"], 1, "last", [("last", ["3"])]))
       && (ran "list --format=json" === Some (["notes", "list"], 0, "list", [("format", ["json"])]))
       && (ran "sync pull" === Some (["notes", "sync", "pull"], 0, "pull", []))
-      && (ran "add x -- --not-a-flag" === Some (["notes", "add"], 0, "add", [("TEXT", ["x"]), ("MORE", [rest])])))
+      && (ran "add x -- --not-a-flag" === Some (["notes", "add"], 0, "add", [("TEXT", ["x"]), ("MORE", [rest])]))
+      && (ran "add x --tag=--pin" === Some (["notes", "add"], 0, "add", [("tag", ["--pin"]), ("TEXT", ["x"])]))
+      && (ran "add x --tag --not-a-flag" === Some (["notes", "add"], 0, "add", [("tag", [rest]), ("TEXT", ["x"])])))
 
 -- Help is asked for anywhere before ''--''; after it, ''--help'' is a word like any other.
 test> cmdtree.tests.help =

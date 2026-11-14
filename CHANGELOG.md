@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.1.2 — 2026-11-14
+
+- A call that mixes the options of two forms names both options. The options given pick a form in the order given,
+  each keeping the forms that take it; the first option that form does not take is refused with the option that
+  picked the form: `run --circuit X --from-session S --dry` says `run: --dry goes with another form than
+  --from-session: run --circuit TEXT [--dry]` (it named `--from-session` alone, the wrong option). The other form
+  shown is the one, among those that take the refused option, that the options given pick.
+- `Refusal.OptionOfAnotherForm` has a field more: `OptionOfAnotherForm path flag by other`, where `by` is the
+  option that picked the form. A program that matches on it adds one field to the pattern.
+- The word after an option that takes a value is no longer its value when it names an option of the command:
+  `--model --where` is refused as `MissingValue` (`--model needs a value`), as `--model` with nothing after it is.
+  A word that names no option is still a value, even one that begins with `--`, and `--model=--where` gives any
+  word as the value.
+- `cmdtree.Form.takes`: whether a form takes an option, by name; `cmdtree.attached` splits `--name=value`.
+
 ## 0.1.1 — 2026-11-12
 
 - `example/Notes.u`: a whole program built with cmdtree (`cmdtree.example.main`), which the README shows running,

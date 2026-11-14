@@ -17,6 +17,9 @@ test> cmdtree.tests.refusals =
       && (no "list --limt 3" === Some (UnknownOption list "--limt" (Some "--limit")))
       && (no "list --pin" === Some (UnknownOption list "--pin" None))
       && (no "list --limit" === Some (MissingValue list "--limit"))
+      && (no "list --limit --format json" === Some (MissingValue list "--limit"))
+      && (no "list --limit --format=json" === Some (MissingValue list "--limit"))
+      && (no "add x --tag -p" === Some (MissingValue ["notes", "add"] "--tag"))
       && (no "list --limit x" === Some (BadValue list "--limit" "nat" "x" "it is not a whole number of 0 or more"))
       && (no "list --format=xml" === Some (BadValue list "--format" "choice" "xml" "it is not one of text, json"))
       && (no "list --limit 1 --limit 2" === Some (GivenTwice list "--limit"))
@@ -27,7 +30,8 @@ test> cmdtree.tests.refusals =
       && (no "add x --pin=yes" === Some (BadValue ["notes", "add"] "--pin" "switch" "yes" "a switch takes no value"))
       && (no "sync pull 2026-02-30" === Some (BadValue (sync :+ "pull") "DAY" "day" "2026-02-30" notDay)))
 
--- An option that belongs to another form of the same command is named with that form's synopsis.
+-- An option that belongs to another form of the same command is named with that form's synopsis, and with the option
+-- given that picked the form it does not belong to.
 test> cmdtree.tests.otherForm =
   node =
     use cmdtree command form option required switch
@@ -35,4 +39,32 @@ test> cmdtree.tests.otherForm =
     b = form [switch "all" "Every session."] [cmdtree.arg "SESSION" cmdtree.Kind.Plain "A session."] "bySession"
     command "stats" "" "Figures." [] [a, b]
   got = cmdtree.parse node ["--project", "x", "--all"]
-  check (got === Left (cmdtree.Refusal.OptionOfAnotherForm ["stats"] "--all" "stats SESSION [--all]"))
+  check (got === Left (cmdtree.Refusal.OptionOfAnotherForm ["stats"] "--all" "--project" "stats SESSION [--all]"))
+
+-- A call that mixes the options of two forms names both: the option that picked one form, in the order given, and
+-- the option that belongs only to the other, with the other's synopsis. Options both forms take pick neither.
+test> cmdtree.tests.mixedForms =
+  use cmdtree command form option required switch
+  use cmdtree.Kind Plain
+  circuit = required (option "circuit" Plain "A circuit.")
+  dry = switch "dry" "Run nothing."
+  run =
+    pipe = form [option "pipe" Plain "A pipe.", dry] [] "pipe"
+    from = form [circuit, required (option "from-session" Plain "A session.")] [] "from"
+    command "run" "" "Run." [] [pipe, form [circuit, dry] [] "circuit", from]
+  start =
+    claude = switch "claude" "Claude."
+    fresh = form [claude, option "resume" Plain "A session to resume."] [] "fresh"
+    command "start" "" "Start." [] [fresh, form [claude, required (option "handoff" Plain "A session.")] [] "take"]
+  said node words = match cmdtree.parse node words with
+    Left r -> cmdtree.Refusal.say r
+    Right _ -> "ran"
+  check
+    ((said run ["--circuit", "x", "--from-session", "s", "--dry"]
+        === "run: --dry goes with another form than --from-session: run --circuit TEXT [--dry]")
+      && (said run ["--circuit", "x", "--dry", "--from-session", "s"]
+        === "run: --from-session goes with another form than --dry: run --circuit TEXT --from-session TEXT")
+      && (said start ["--claude", "--handoff", "s", "--resume", "r"]
+        === "start: --resume goes with another form than --handoff: start [--claude] [--resume TEXT]")
+      && (said start ["--resume", "r", "--handoff", "s"]
+        === "start: --handoff goes with another form than --resume: start --handoff TEXT [--claude]"))
